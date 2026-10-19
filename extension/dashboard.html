@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobPulse Dashboard | Application Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B1120;
+      --card-bg: #0F172A;
+      --border: #1E293B;
+      --accent: #2563EB;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      padding: 28px;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Top Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -0.3px;
+    }
+
+    .badge {
+      background: #1E3A8A;
+      color: #93C5FD;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 12.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #FFFFFF;
+    }
+
+    .btn-primary:hover {
+      background: #1D4ED8;
+    }
+
+    .btn-success {
+      background: #10B981;
+      color: #FFFFFF;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .btn-secondary {
+      background: #1E293B;
+      color: #CBD5E1;
+    }
+
+    .btn-secondary:hover {
+      background: #334155;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+
+    .stat-val {
+      font-size: 24px;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+
+    /* Filter Controls */
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 18px;
+      align-items: center;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 9px 14px;
+      background: #0F172A;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #FFFFFF;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .filter-select {
+      padding: 9px 12px;
+      background: #0F172A;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #CBD5E1;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Main Table */
+    .table-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: #0F2C59;
+      color: #FFFFFF;
+      font-weight: 700;
+      padding: 11px 14px;
+      text-transform: uppercase;
+      font-size: 10.5px;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: #CBD5E1;
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: rgba(30, 41, 59, 0.5);
+    }
+
+    .status-pill {
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-block;
+    }
+
+    .status-Applied { background: rgba(2, 132, 199, 0.15); color: #38BDF8; border: 1px solid rgba(2, 132, 199, 0.3); }
+    .status-Wishlist { background: rgba(148, 163, 184, 0.15); color: #94A3B8; border: 1px solid rgba(148, 163, 184, 0.3); }
+    .status-Interviewing { background: rgba(217, 119, 6, 0.15); color: #FBBF24; border: 1px solid rgba(217, 119, 6, 0.3); }
+    .status-Offer-Received { background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .status-Rejected { background: rgba(225, 29, 72, 0.15); color: #FB7185; border: 1px solid rgba(225, 29, 72, 0.3); }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+    }
+
+    .link-btn {
+      color: #38BDF8;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .link-btn:hover {
+      text-decoration: underline;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #64748B;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .btn-delete:hover {
+      color: #EF4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <h1>📊 JobPulse Cockpit</h1>
+        <span class="badge">Universal Edition</span>
+      </div>
+      <div class="header-actions">
+        <button id="exportCsvBtn" class="btn btn-success">📥 Export to CSV / Excel</button>
+        <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Tracked</div>
+        <div class="stat-val" id="statTotal">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Applied</div>
+        <div class="stat-val" id="statApplied" style="color: #38BDF8;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Interviewing</div>
+        <div class="stat-val" id="statInterview" style="color: #FBBF24;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Offers</div>
+        <div class="stat-val" id="statOffers" style="color: #34D399;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Rejected</div>
+        <div class="stat-val" id="statRejected" style="color: #FB7185;">0</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search by company, role, location, platform, notes...">
+      <select id="statusFilter" class="filter-select">
+        <option value="ALL">All Statuses</option>
+        <option value="Applied">Applied</option>
+        <option value="Wishlist">Wishlist / Target</option>
+        <option value="Interviewing">Interviewing</option>
+        <option value="Offer Received">Offer Received</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+    </div>
+
+    <!-- Applications Table -->
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>App ID</th>
+            <th>Date</th>
+            <th>Company</th>
+            <th>Job Title</th>
+            <th>Job Type</th>
+            <th>Location</th>
+            <th>Platform</th>
+            <th>Status</th>
+            <th>Link</th>
+            <th>Salary</th>
+            <th>Notes</th>
+            <th style="text-align: center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- Rows dynamically injected -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobPulse - Application Tracker</title>
+  <style>
+    :root {
+      --primary: #0F172A;
+      --primary-hover: #1E293B;
+      --accent: #2563EB;
+      --accent-hover: #1D4ED8;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      width: 390px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.4;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Header */
+    .header {
+      background: var(--primary);
+      color: #FFFFFF;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.2px;
+    }
+
+    .header-tag {
+      font-size: 10px;
+      background: rgba(37, 99, 235, 0.4);
+      color: #93C5FD;
+      padding: 2px 6px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    /* Status Pill */
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34D399;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .status-pill.offline {
+      background: rgba(100, 116, 139, 0.25);
+      color: #94A3B8;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+    }
+
+    .status-pill.offline .status-dot {
+      background: #94A3B8;
+    }
+
+    /* Quick Action Bar */
+    .action-bar {
+      background: #0B132B;
+      padding: 8px 12px;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid #1E293B;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 7px 10px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: background 0.15s, transform 0.05s;
+    }
+
+    .action-btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-dashboard {
+      background: var(--accent);
+      color: #FFFFFF;
+    }
+
+    .btn-dashboard:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-excel {
+      background: #059669;
+      color: #FFFFFF;
+    }
+
+    .btn-excel:hover {
+      background: #047857;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      flex: 1;
+      text-align: center;
+      padding: 9px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover {
+      color: var(--primary);
+      background: #F1F5F9;
+    }
+
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: #FFFFFF;
+    }
+
+    /* Content Area */
+    .tab-content {
+      padding: 12px 14px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Form Fields */
+    .form-group {
+      margin-bottom: 10px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 7px 9px;
+      font-size: 12.5px;
+      color: var(--text);
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 48px;
+    }
+
+    /* Toast Notification Banner */
+    #toast {
+      display: none;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    #toast.success {
+      display: block;
+      background: #DCFCE7;
+      color: #166534;
+      border: 1px solid #86EFAC;
+    }
+
+    #toast.error {
+      display: block;
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FCA5A5;
+    }
+
+    /* Buttons */
+    .btn-submit {
+      width: 100%;
+      padding: 10px;
+      background: var(--accent);
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 700;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s, transform 0.05s;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-submit:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 7px;
+      margin-top: 6px;
+      background: #FFFFFF;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background 0.15s;
+    }
+
+    .btn-secondary:hover {
+      background: #F1F5F9;
+      color: var(--text);
+    }
+
+    /* Recent Applications List */
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 330px;
+      overflow-y: auto;
+    }
+
+    .recent-item {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 11.5px;
+    }
+
+    .recent-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+
+    .recent-company {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 12px;
+    }
+
+    .recent-status {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-weight: 600;
+      background: #E2E8F0;
+    }
+
+    .recent-title {
+      color: var(--text);
+      font-weight: 500;
+      margin-bottom: 3px;
+    }
+
+    .recent-meta {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Cards */
+    .card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+
+    .card h4 {
+      font-size: 12px;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .card p, .card li {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .card ul {
+      padding-left: 16px;
+      margin-top: 4px;
+    }
+
+    code {
+      background: #E2E8F0;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <div class="header">
+    <div class="header-brand">
+      <span>JobPulse</span>
+      <span class="header-tag">Universal</span>
+    </div>
+    <div id="statusPill" class="status-pill offline" title="Click to refresh sync status">
+      <div class="status-dot"></div>
+      <span id="statusText">Browser Local</span>
+    </div>
+  </div>
+
+  <!-- Quick Action Bar -->
+  <div class="action-bar">
+    <button type="button" id="openDashboardBtn" class="action-btn btn-dashboard">
+      <span>🌐 Open Dashboard</span>
+    </button>
+    <button type="button" id="openExcelBtn" class="action-btn btn-excel">
+      <span>📊 Excel Sync</span>
+    </button>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tab-add">Log Job</button>
+    <button class="tab-btn" data-tab="tab-recent">Applications (<span id="recentCount">0</span>)</button>
+    <button class="tab-btn" data-tab="tab-settings">Setup & Sync</button>
+  </div>
+
+  <!-- TAB 1: ADD JOB FORM -->
+  <div id="tab-add" class="tab-content active">
+    <div id="toast"></div>
+
+    <form id="jobForm">
+      <div class="form-group">
+        <label for="company">Company Name *</label>
+        <input type="text" id="company" required placeholder="e.g. Google, Microsoft, Maybank">
+      </div>
+
+      <div class="form-group">
+        <label for="jobTitle">Job Title *</label>
+        <input type="text" id="jobTitle" required placeholder="e.g. Software Engineer, Data Analyst">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="platform">Platform / Source</label>
+          <select id="platform">
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="JobStreet">JobStreet</option>
+            <option value="Indeed">Indeed</option>
+            <option value="Company Portal">Company Portal</option>
+            <option value="Glassdoor">Glassdoor</option>
+            <option value="Handshake">Handshake</option>
+            <option value="MyFutureJobs">MyFutureJobs</option>
+            <option value="Referral">Referral</option>
+            <option value="Career Fair">Career Fair</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="Applied">Applied</option>
+            <option value="Wishlist / Target">Wishlist / Target</option>
+            <option value="Assessment / Test">Assessment / Test</option>
+            <option value="Interviewing">Interviewing</option>
+            <option value="Shortlisted">Shortlisted</option>
+            <option value="Offer Received">Offer Received</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="jobType">Job Type</label>
+          <select id="jobType">
+            <option value="Graduate Programme">Graduate Programme</option>
+            <option value="Full-time">Full-time</option>
+            <option value="Internship">Internship</option>
+            <option value="Management Trainee">Management Trainee</option>
+            <option value="Contract">Contract</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="location">Location</label>
+          <input type="text" id="location" placeholder="e.g. Kuala Lumpur / Remote">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dateApplied">Date Applied</label>
+          <input type="date" id="dateApplied">
+        </div>
+
+        <div class="form-group">
+          <label for="salary">Salary / Range</label>
+          <input type="text" id="salary" placeholder="e.g. 5,000 / $80k">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">HR / Recruiter Email</label>
+        <input type="text" id="email" placeholder="e.g. careers@company.com">
+      </div>
+
+      <div class="form-group">
+        <label for="url">Job Posting URL</label>
+        <input type="url" id="url" placeholder="https://...">
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Notes & Key Skills</label>
+        <textarea id="notes" placeholder="e.g. Tech stack: React, Python; HR screening on Friday..."></textarea>
+      </div>
+
+      <button type="submit" id="saveBtn" class="btn-submit">
+        <span>Save Application</span>
+      </button>
+
+      <button type="button" id="copyDetailsBtn" class="btn-secondary">
+        <span>Copy Application Summary</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- TAB 2: RECENT APPLICATIONS -->
+  <div id="tab-recent" class="tab-content">
+    <div id="recentContainer" class="recent-list">
+      <p style="text-align: center; color: var(--text-muted); padding: 20px;">No applications saved yet.</p>
+    </div>
+    <button id="exportCsvBtn" class="btn-secondary" style="margin-top: 10px;">
+      <span>📥 Export All to CSV (Excel / Sheets)</span>
+    </button>
+  </div>
+
+  <!-- TAB 3: SETUP & SYNC -->
+  <div id="tab-settings" class="tab-content">
+    <div class="card">
+      <h4>💾 Standalone Mode (Zero-Config)</h4>
+      <p>Works right out of the box on <b>Mac, Windows, and Linux</b>! All jobs are saved securely in your browser's local database. You can export to CSV anytime.</p>
+    </div>
+
+    <div class="card">
+      <h4>⚡ Live Desktop Excel Sync (Optional)</h4>
+      <p id="bridgeDetail">Bridge status: checking...</p>
+      <ul style="margin-top: 6px;">
+        <li><b>Windows:</b> Double-click <code>start_bridge.bat</code> in the <code>bridge/</code> folder.</li>
+        <li><b>macOS / Linux:</b> Run <code>bash start_bridge.sh</code> in the terminal.</li>
+        <li>Auto-creates <code>Job_Applications_Tracker.xlsx</code> in your user Documents folder.</li>
+      </ul>
+      <button id="retryBridgeBtn" class="btn-secondary" style="margin-top: 8px;">
+        🔄 Check Bridge Connection
+      </button>
+    </div>
+
+    <div class="card">
+      <h4>🌐 Browser Support</h4>
+      <p>Tested and fully compatible with <b>Google Chrome</b>, <b>Opera & Opera GX</b>, <b>Microsoft Edge</b>, <b>Brave</b>, and <b>Arc Browser</b>.</p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
