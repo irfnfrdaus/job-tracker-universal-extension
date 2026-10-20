@@ -55,6 +55,7 @@ async function checkBridgeStatus() {
       if (bridgeDetail) {
         bridgeDetail.innerHTML = `<span style="color: #10B981; font-weight: 600;">Active</span> • File: <code>${data.excel_path}</code><br>Total Records: <b>${data.total_records}</b>`;
       }
+      syncOfflineJobsToExcel();
       return true;
     }
   } catch (err) {
@@ -68,6 +69,42 @@ async function checkBridgeStatus() {
     bridgeDetail.innerHTML = `<span style="color: #64748B; font-weight: 600;">Standalone Mode</span>. Applications save directly inside your browser storage.<br>Run <code>start_bridge</code> to link with desktop Excel.`;
   }
   return false;
+}
+
+// Auto-sync any jobs saved while offline to desktop Excel
+async function syncOfflineJobsToExcel() {
+  if (!isBridgeConnected) return;
+  chrome.storage.local.get({ jobs: [] }, async (res) => {
+    const jobs = res.jobs || [];
+    let syncedAny = false;
+
+    for (let i = 0; i < jobs.length; i++) {
+      const j = jobs[i];
+      if (j.app_id && j.app_id.startsWith("LOCAL-")) {
+        try {
+          const response = await fetch(`${BRIDGE_URL}/add-job`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(j)
+          });
+          if (response.ok) {
+            const result = await response.json();
+            jobs[i].app_id = result.app_id;
+            syncedAny = true;
+          }
+        } catch (err) {
+          console.warn("Could not sync offline job:", err);
+        }
+      }
+    }
+
+    if (syncedAny) {
+      chrome.storage.local.set({ jobs }, () => {
+        loadRecentApplications();
+        showToast("Synced offline applications to Excel!", "success");
+      });
+    }
+  });
 }
 
 // Auto-Detect Information from Active Tab
@@ -279,7 +316,7 @@ async function handleSubmit(e) {
         job.app_id = result.app_id;
         await saveToLocalStorage(job);
         await loadRecentApplications();
-        showToast(`Saved to Excel as ${result.app_id}!`, "success");
+        showToast(result.message || `Saved to Excel as ${result.app_id}!`, "success");
         resetFormExceptDates();
         saveBtn.disabled = false;
         saveBtn.innerText = "Save Application";

@@ -17,6 +17,8 @@ Log applications from **LinkedIn, JobStreet, Indeed, Glassdoor, and career porta
 - **🌐 Full In-Browser Cockpit:** Includes a built-in dark mode dashboard with search, filtering, and metric cards (`Total`, `Applied`, `Interviewing`, `Offers`, `Rejected`).
 - **📥 CSV & Excel Export:** Export your entire job hunt database to CSV in one click for Google Sheets, Numbers, or Excel.
 - **💻 Desktop Excel Sync (Optional):** Automatically writes formatted rows with colored status tags to your local `.xlsx` file via a lightweight Python bridge.
+- **🛡️ Unblockable File-Lock Queue:** If Microsoft Excel is open while you save, jobs are queued safely without throwing file-lock (`PermissionError`) errors and flushed automatically the second Excel is closed.
+- **🔄 Seamless Offline Sync:** Jobs saved while the bridge is disconnected automatically sync and receive sequential IDs the moment the bridge comes online.
 - **🔒 100% Private & Local:** Zero external cloud servers. Your data stays entirely in your browser storage or on your own hard drive.
 
 ---

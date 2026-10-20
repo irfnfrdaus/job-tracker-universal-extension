@@ -10,6 +10,8 @@ import os
 import platform
 import subprocess
 import sys
+import threading
+import time
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import openpyxl
@@ -26,6 +28,7 @@ else:
 
 os.makedirs(DOCS_DIR, exist_ok=True)
 PRIMARY_EXCEL_PATH = os.path.join(DOCS_DIR, "Job_Applications_Tracker.xlsx")
+PENDING_QUEUE_PATH = os.path.join(DOCS_DIR, "pending_jobs.json")
 
 STATUS_COLORS = {
     "Applied": "E0F2FE",        # Light Sky
@@ -89,22 +92,175 @@ def launch_excel():
     """Cross-platform launcher for opening the master Excel file."""
     try:
         if OS_SYSTEM == "Darwin":
-            # macOS
             subprocess.Popen(["open", PRIMARY_EXCEL_PATH])
             return True, "Launched file via macOS open"
         elif OS_SYSTEM == "Windows":
-            # Windows Explorer shell
             subprocess.Popen(["explorer.exe", PRIMARY_EXCEL_PATH])
             return True, "Launched file via Windows Shell"
         else:
-            # Linux (xdg-open)
             subprocess.Popen(["xdg-open", PRIMARY_EXCEL_PATH])
             return True, "Launched file via Linux xdg-open"
     except Exception as e:
         return False, f"Launch failed: {e}"
 
+def format_and_append_row(ws, job, app_id):
+    date_applied = job.get("date_applied") or datetime.now().strftime("%Y-%m-%d")
+    company = job.get("company", "").strip() or "N/A"
+    job_title = job.get("job_title", "").strip() or "N/A"
+    job_type = job.get("job_type", "").strip() or "Full-time"
+    location = job.get("location", "").strip() or "Remote / Hybrid"
+    platform_src = job.get("platform", "").strip() or "Direct"
+    status = job.get("status", "").strip() or "Applied"
+    url = job.get("url", "").strip()
+    email = job.get("email", "").strip()
+    salary = job.get("salary", "").strip()
+    follow_up = job.get("follow_up", "").strip() or datetime.now().strftime("%Y-%m-%d")
+    notes = job.get("notes", "").strip()
+
+    new_row = [
+        app_id,
+        date_applied,
+        company,
+        job_title,
+        job_type,
+        location,
+        platform_src,
+        status,
+        url,
+        email,
+        salary,
+        follow_up,
+        notes
+    ]
+
+    ws.append(new_row)
+    new_row_idx = ws.max_row
+    ws.row_dimensions[new_row_idx].height = 22
+
+    status_bg = STATUS_COLORS.get(status, "FFFFFF")
+
+    for col_idx in range(1, len(new_row) + 1):
+        cell = ws.cell(row=new_row_idx, column=col_idx)
+        cell.font = Font(name="Calibri", size=9.5)
+        cell.border = THIN_BORDER
+        
+        if col_idx in [1, 2, 5, 8, 12]:
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        elif col_idx in [11]:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+            
+        if col_idx == 8:
+            cell.fill = PatternFill(start_color=status_bg, end_color=status_bg, fill_type="solid")
+            cell.font = Font(name="Calibri", size=9.5, bold=True)
+
+    return new_row_idx
+
+def flush_pending_to_excel():
+    pending = []
+    if os.path.exists(PENDING_QUEUE_PATH):
+        try:
+            with open(PENDING_QUEUE_PATH, "r", encoding="utf-8") as f:
+                pending = json.load(f)
+        except Exception:
+            pending = []
+
+    if not pending or not os.path.exists(PRIMARY_EXCEL_PATH):
+        return False
+
+    try:
+        wb = openpyxl.load_workbook(PRIMARY_EXCEL_PATH)
+        ws = wb.active
+
+        for job in pending:
+            app_id = job.get("app_id") or get_next_app_id()
+            format_and_append_row(ws, job, app_id)
+
+        wb.save(PRIMARY_EXCEL_PATH)
+        wb.close()
+
+        if os.path.exists(PENDING_QUEUE_PATH):
+            try:
+                os.remove(PENDING_QUEUE_PATH)
+            except Exception:
+                pass
+        return True
+    except PermissionError:
+        return False
+    except Exception as e:
+        print(f"Flush notice: {e}")
+        return False
+
+def get_next_app_id():
+    max_id_num = 0
+    if os.path.exists(PRIMARY_EXCEL_PATH):
+        try:
+            wb = openpyxl.load_workbook(PRIMARY_EXCEL_PATH, data_only=True)
+            ws = wb.active
+            for row in range(2, ws.max_row + 1):
+                cell_val = str(ws.cell(row=row, column=1).value or "")
+                if cell_val.startswith("APP-"):
+                    try:
+                        num = int(cell_val.replace("APP-", ""))
+                        if num > max_id_num:
+                            max_id_num = num
+                    except ValueError:
+                        pass
+            wb.close()
+        except Exception:
+            pass
+
+    if os.path.exists(PENDING_QUEUE_PATH):
+        try:
+            with open(PENDING_QUEUE_PATH, "r", encoding="utf-8") as f:
+                pending = json.load(f)
+            for j in pending:
+                aid = str(j.get("app_id", ""))
+                if aid.startswith("APP-"):
+                    try:
+                        num = int(aid.replace("APP-", ""))
+                        if num > max_id_num:
+                            max_id_num = num
+                    except ValueError:
+                        pass
+        except Exception:
+            pass
+
+    return f"APP-{max_id_num + 1:03d}"
+
+def append_job_to_excel(job):
+    init_excel_if_missing()
+    flush_pending_to_excel()
+
+    next_id = get_next_app_id()
+    job["app_id"] = next_id
+
+    try:
+        wb = openpyxl.load_workbook(PRIMARY_EXCEL_PATH)
+        ws = wb.active
+        new_row_idx = format_and_append_row(ws, job, next_id)
+        wb.save(PRIMARY_EXCEL_PATH)
+        wb.close()
+        return next_id, new_row_idx - 1, "saved"
+    except PermissionError:
+        # File is locked by open Excel instance! Queue safely without failing!
+        pending = []
+        if os.path.exists(PENDING_QUEUE_PATH):
+            try:
+                with open(PENDING_QUEUE_PATH, "r", encoding="utf-8") as f:
+                    pending = json.load(f)
+            except Exception:
+                pending = []
+        pending.append(job)
+        with open(PENDING_QUEUE_PATH, "w", encoding="utf-8") as f:
+            json.dump(pending, f, indent=2)
+
+        return next_id, len(pending), "queued"
+
 def get_tracker_html():
-    """Generates the live web view table from the master Excel spreadsheet."""
+    flush_pending_to_excel()
+
     rows = []
     if os.path.exists(PRIMARY_EXCEL_PATH):
         try:
@@ -116,6 +272,14 @@ def get_tracker_html():
             wb.close()
         except Exception as e:
             rows = [[f"Error loading Excel: {e}"]]
+
+    pending_jobs = []
+    if os.path.exists(PENDING_QUEUE_PATH):
+        try:
+            with open(PENDING_QUEUE_PATH, "r", encoding="utf-8") as f:
+                pending_jobs = json.load(f)
+        except Exception:
+            pending_jobs = []
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -162,8 +326,13 @@ def get_tracker_html():
   </div>
 
   <div id="launchToast" style="display: none; padding: 10px 14px; background: #064E3B; border: 1px solid #059669; color: #A7F3D0; border-radius: 8px; margin-bottom: 16px; font-weight: 600; font-size: 12px;"></div>
+"""
+    if pending_jobs:
+        html += f"""  <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #F59E0B; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; color: #FDE68A; font-size: 12px;">
+    ⚠️ <b>{len(pending_jobs)} new application(s) queued live!</b> Because Excel is open on your desktop, they will automatically write to your .xlsx file the moment Excel is closed.
+  </div>"""
 
-  <div class="card">
+    html += """  <div class="card">
     <table>
       <thead>
         <tr>"""
@@ -206,6 +375,27 @@ def get_tracker_html():
             notes = row[12] if len(row) > 12 else ''
             html += f"<td style='color: #94A3B8; max-width: 320px; font-size: 11px;'>{notes}</td>"
             html += "</tr>"
+
+        # Also render pending queued jobs in live web view
+        for pj in pending_jobs:
+            status_text = pj.get("status", "Applied")
+            status_class = f"status-{status_text.replace(' ', '-').replace('/', '-')}"
+            url_text = pj.get("url", "")
+            link_html = f"<a href='{url_text}' target='_blank' style='color: #38BDF8;'>Link ↗</a>" if url_text.startswith("http") else "<td style='color: #64748B;'>-</td>"
+            html += f"""<tr style="background: rgba(16, 185, 129, 0.08);">
+              <td class='mono' style='color: #34D399; font-weight: bold;'>{pj.get('app_id', 'NEW')} <span style="font-size: 9px; background: #059669; color: white; padding: 1px 4px; border-radius: 4px;">LIVE</span></td>
+              <td class='mono' style='color: #94A3B8;'>{pj.get('date_applied', '')}</td>
+              <td style='color: #FFFFFF; font-weight: 600;'>{pj.get('company', '')}</td>
+              <td style='color: #E2E8F0;'>{pj.get('job_title', '')}</td>
+              <td style='color: #94A3B8;'>{pj.get('job_type', '')}</td>
+              <td style='color: #94A3B8;'>{pj.get('location', '')}</td>
+              <td style='color: #CBD5E1;'>{pj.get('platform', '')}</td>
+              <td><span class='status-pill {status_class}'>{status_text}</span></td>
+              <td>{link_html}</td>
+              <td class='mono' style='color: #34D399; font-weight: 600;'>{pj.get('salary', '')}</td>
+              <td style='color: #94A3B8; max-width: 320px; font-size: 11px;'>{pj.get('notes', '')}</td>
+            </tr>"""
+
         html += """</tbody></table></div>
   <script>
     async function launchExcel(btn) {
@@ -232,83 +422,6 @@ def get_tracker_html():
 </body></html>"""
     return html
 
-def append_job_to_excel(job):
-    init_excel_if_missing()
-
-    wb = openpyxl.load_workbook(PRIMARY_EXCEL_PATH)
-    ws = wb.active
-
-    max_id_num = 0
-    for row in range(2, ws.max_row + 1):
-        cell_val = str(ws.cell(row=row, column=1).value or "")
-        if cell_val.startswith("APP-"):
-            try:
-                num = int(cell_val.replace("APP-", ""))
-                if num > max_id_num:
-                    max_id_num = num
-            except ValueError:
-                pass
-    next_id = f"APP-{max_id_num + 1:03d}"
-
-    date_applied = job.get("date_applied") or datetime.now().strftime("%Y-%m-%d")
-    company = job.get("company", "").strip() or "N/A"
-    job_title = job.get("job_title", "").strip() or "N/A"
-    job_type = job.get("job_type", "").strip() or "Full-time"
-    location = job.get("location", "").strip() or "Remote / Hybrid"
-    platform_src = job.get("platform", "").strip() or "Direct"
-    status = job.get("status", "").strip() or "Applied"
-    url = job.get("url", "").strip()
-    email = job.get("email", "").strip()
-    salary = job.get("salary", "").strip()
-    follow_up = job.get("follow_up", "").strip() or datetime.now().strftime("%Y-%m-%d")
-    notes = job.get("notes", "").strip()
-
-    new_row = [
-        next_id,
-        date_applied,
-        company,
-        job_title,
-        job_type,
-        location,
-        platform_src,
-        status,
-        url,
-        email,
-        salary,
-        follow_up,
-        notes
-    ]
-
-    ws.append(new_row)
-    new_row_idx = ws.max_row
-    ws.row_dimensions[new_row_idx].height = 22
-
-    status_bg = STATUS_COLORS.get(status, "FFFFFF")
-
-    for col_idx in range(1, len(new_row) + 1):
-        cell = ws.cell(row=new_row_idx, column=col_idx)
-        cell.font = Font(name="Calibri", size=9.5)
-        cell.border = THIN_BORDER
-        
-        if col_idx in [1, 2, 5, 8, 12]:
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-        elif col_idx in [11]:
-            cell.alignment = Alignment(horizontal="right", vertical="center")
-        else:
-            cell.alignment = Alignment(horizontal="left", vertical="center")
-            
-        if col_idx == 8:
-            cell.fill = PatternFill(start_color=status_bg, end_color=status_bg, fill_type="solid")
-            cell.font = Font(name="Calibri", size=9.5, bold=True)
-
-    try:
-        wb.save(PRIMARY_EXCEL_PATH)
-        wb.close()
-    except PermissionError:
-        raise PermissionError("Your Excel file is currently open in another app. Please close it and retry.")
-
-    return next_id, new_row_idx - 1
-
 class TrackerHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -332,11 +445,20 @@ class TrackerHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
+            pending_count = 0
+            if os.path.exists(PENDING_QUEUE_PATH):
+                try:
+                    with open(PENDING_QUEUE_PATH, "r", encoding="utf-8") as f:
+                        pending_count = len(json.load(f))
+                except Exception:
+                    pass
+
             response_data = {
                 "status": "connected",
                 "os": OS_SYSTEM,
                 "excel_path": PRIMARY_EXCEL_PATH,
-                "total_records": total_records,
+                "total_records": total_records + pending_count,
+                "pending_queue": pending_count,
                 "message": "JobPulse Sync Bridge is Active"
             }
             self.send_response(200)
@@ -371,25 +493,22 @@ class TrackerHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             try:
                 job_data = json.loads(post_data.decode("utf-8"))
-                app_id, total = append_job_to_excel(job_data)
+                app_id, total, status_type = append_job_to_excel(job_data)
                 
+                msg = f"Successfully logged {app_id} to Excel!" if status_type == "saved" else f"Added {app_id} to live tracker! (Will sync to Excel file as soon as Excel closes)"
+
                 response_data = {
                     "success": True,
                     "app_id": app_id,
                     "total_records": total,
-                    "message": f"Successfully logged {app_id} to {PRIMARY_EXCEL_PATH}!"
+                    "status_type": status_type,
+                    "message": msg
                 }
                 self.send_response(200)
                 self._send_cors_headers()
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(response_data).encode("utf-8"))
-            except PermissionError as pe:
-                self.send_response(423)
-                self._send_cors_headers()
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"success": False, "error": str(pe)}).encode("utf-8"))
             except Exception as e:
                 self.send_response(500)
                 self._send_cors_headers()
@@ -404,6 +523,11 @@ class TrackerHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
+def background_worker():
+    while True:
+        time.sleep(3)
+        flush_pending_to_excel()
+
 def run_server():
     init_excel_if_missing()
     server_address = ("127.0.0.1", PORT)
@@ -414,6 +538,10 @@ def run_server():
     print(f"   Dashboard:    http://127.0.0.1:{PORT}/view")
     print("=" * 60)
     print("Bridge is running. Keep this terminal window open.")
+
+    t = threading.Thread(target=background_worker, daemon=True)
+    t.start()
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
