@@ -44,22 +44,31 @@ THIN_BORDER = Border(
 )
 
 def launch_excel():
+    excel_candidates = [
+        r"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE",
+        r"C:\Program Files (x86)\Microsoft Office\root\Office16\EXCEL.EXE",
+        r"C:\Program Files\Microsoft Office\Office16\EXCEL.EXE",
+        r"C:\Program Files (x86)\Microsoft Office\Office16\EXCEL.EXE",
+    ]
+    for exe in excel_candidates:
+        if os.path.exists(exe):
+            try:
+                subprocess.Popen([exe, PRIMARY_EXCEL_PATH])
+                return True, "Launched Microsoft Excel directly"
+            except Exception:
+                pass
+
     try:
-        subprocess.Popen(["explorer.exe", PRIMARY_EXCEL_PATH])
-        return True, "Launched Excel via Windows Explorer Shell"
+        os.startfile(PRIMARY_EXCEL_PATH)
+        return True, "Launched Excel via Windows shell"
+    except Exception:
+        pass
+
+    try:
+        subprocess.Popen(["cmd.exe", "/c", "start", "", PRIMARY_EXCEL_PATH], shell=True)
+        return True, "Launched Excel via cmd start"
     except Exception as e:
-        try:
-            if os.path.exists(EXCEL_EXE):
-                si = subprocess.STARTUPINFO()
-                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                si.wShowWindow = 1
-                subprocess.Popen([EXCEL_EXE, PRIMARY_EXCEL_PATH], startupinfo=si)
-                return True, "Launched Excel via Office 16 executable"
-            else:
-                os.startfile(PRIMARY_EXCEL_PATH)
-                return True, "Launched via os.startfile"
-        except Exception as e2:
-            return False, f"Launch failed: {e} | {e2}"
+        return False, f"Could not launch Excel: {e}"
 
 def format_and_append_row(ws, job, app_id):
     date_applied = job.get("date_applied") or datetime.now().strftime("%Y-%m-%d")
