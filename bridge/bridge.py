@@ -1,13 +1,6 @@
-"""
-JobPulse - Universal Desktop Excel Sync Bridge
-Supports: macOS, Windows, Linux
-Author: Muhammad Irfan Firdaus (irfnfrdaus)
-License: MIT
-"""
-
 import json
 import os
-import platform
+import shutil
 import subprocess
 import sys
 import threading
@@ -17,28 +10,30 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
+PRIMARY_EXCEL_PATH = r"C:\Users\ASUS\Job_Tracker\Job_Applications_Tracker.xlsx"
+PENDING_QUEUE_PATH = r"C:\Users\ASUS\Job_Tracker\pending_jobs.json"
+BACKUP_EXCEL_DIR = r"E:\JOB APPLICATION"
+BACKUP_EXCEL_PATH = r"E:\JOB APPLICATION\Job_Applications_Tracker.xlsx"
 PORT = 5252
-OS_SYSTEM = platform.system()
+EXCEL_EXE = r"C:\Program Files\Microsoft Office\Root\Office16\EXCEL.EXE"
 
-# Determine user's default Documents directory cross-platform
-if OS_SYSTEM == "Windows":
-    DOCS_DIR = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Documents", "Job_Tracker")
-else:
-    DOCS_DIR = os.path.join(os.path.expanduser("~"), "Documents", "Job_Tracker")
-
-os.makedirs(DOCS_DIR, exist_ok=True)
-PRIMARY_EXCEL_PATH = os.path.join(DOCS_DIR, "Job_Applications_Tracker.xlsx")
-PENDING_QUEUE_PATH = os.path.join(DOCS_DIR, "pending_jobs.json")
+TARGET_URL_UPDATES = {
+    "APP-001": "https://www.petronas.com/careers",
+    "APP-002": "https://maybankjobs.com/#/home",
+    "APP-003": "https://www.cimb.com/en/careers/fresh-graduate/the-complete-banker.html",
+    "APP-005": "https://www.bnm.gov.my/careers/vacancy",
+    "APP-007": "https://maxine.wd3.myworkdayjobs.com/Maxis-Early-Careers"
+}
 
 STATUS_COLORS = {
-    "Applied": "E0F2FE",        # Light Sky
-    "Under Review": "FEF3C7",   # Light Yellow
+    "Applied": "DCFCE7",        # Soft Green
+    "Under Review": "E0F2FE",   # Soft Sky Blue
     "Assessment / Test": "EDE9FE", # Light Purple
-    "Interviewing": "FDE68A",   # Warm Amber
-    "Shortlisted": "D1FAE5",    # Soft Green
+    "Interviewing": "FEF3C7",   # Warm Amber
+    "Shortlisted": "D1FAE5",    # Soft Teal / Green
     "Offer Received": "86EFAC", # Vibrant Mint
     "Rejected": "FEE2E2",       # Soft Red
-    "Wishlist / Target": "F1F5F9" # Light Slate
+    "Target / Backlog": "F8FAFC" # Neutral Light Slate
 }
 
 THIN_BORDER = Border(
@@ -48,68 +43,31 @@ THIN_BORDER = Border(
     bottom=Side(style='thin', color='CBD5E1')
 )
 
-def init_excel_if_missing():
-    """Initializes a new Excel workbook if one does not already exist."""
-    if os.path.exists(PRIMARY_EXCEL_PATH):
-        return
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Applications"
-
-    headers = [
-        "App ID", "Date Applied", "Company Name", "Job Title", "Job Type",
-        "Location", "Platform / Source", "Application Status", "Job Posting URL",
-        "HR / Contact Email", "Expected Salary", "Follow-Up Date", "Notes / Tech Stack"
-    ]
-
-    ws.append(headers)
-
-    header_fill = PatternFill(start_color="0F2C59", end_color="0F2C59", fill_type="solid")
-    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
-
-    for col_idx in range(1, len(headers) + 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = THIN_BORDER
-
-    ws.row_dimensions[1].height = 26
-
-    widths = {
-        "A": 12, "B": 14, "C": 26, "D": 32, "E": 20, "F": 22,
-        "G": 18, "H": 20, "I": 35, "J": 26, "K": 18, "L": 14, "M": 40
-    }
-    for col, width in widths.items():
-        ws.column_dimensions[col].width = width
-
-    wb.save(PRIMARY_EXCEL_PATH)
-    wb.close()
-    print(f"Created new master Excel spreadsheet at: {PRIMARY_EXCEL_PATH}")
-
 def launch_excel():
-    """Cross-platform launcher for opening the master Excel file."""
     try:
-        if OS_SYSTEM == "Darwin":
-            subprocess.Popen(["open", PRIMARY_EXCEL_PATH])
-            return True, "Launched file via macOS open"
-        elif OS_SYSTEM == "Windows":
-            subprocess.Popen(["explorer.exe", PRIMARY_EXCEL_PATH])
-            return True, "Launched file via Windows Shell"
-        else:
-            subprocess.Popen(["xdg-open", PRIMARY_EXCEL_PATH])
-            return True, "Launched file via Linux xdg-open"
+        subprocess.Popen(["explorer.exe", PRIMARY_EXCEL_PATH])
+        return True, "Launched Excel via Windows Explorer Shell"
     except Exception as e:
-        return False, f"Launch failed: {e}"
+        try:
+            if os.path.exists(EXCEL_EXE):
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 1
+                subprocess.Popen([EXCEL_EXE, PRIMARY_EXCEL_PATH], startupinfo=si)
+                return True, "Launched Excel via Office 16 executable"
+            else:
+                os.startfile(PRIMARY_EXCEL_PATH)
+                return True, "Launched via os.startfile"
+        except Exception as e2:
+            return False, f"Launch failed: {e} | {e2}"
 
 def format_and_append_row(ws, job, app_id):
     date_applied = job.get("date_applied") or datetime.now().strftime("%Y-%m-%d")
     company = job.get("company", "").strip() or "N/A"
     job_title = job.get("job_title", "").strip() or "N/A"
-    job_type = job.get("job_type", "").strip() or "Full-time"
-    location = job.get("location", "").strip() or "Remote / Hybrid"
-    platform_src = job.get("platform", "").strip() or "Direct"
+    job_type = job.get("job_type", "").strip() or "Graduate / Permanent"
+    location = job.get("location", "").strip() or "Malaysia"
+    platform = job.get("platform", "").strip() or "Direct"
     status = job.get("status", "").strip() or "Applied"
     url = job.get("url", "").strip()
     email = job.get("email", "").strip()
@@ -124,7 +82,7 @@ def format_and_append_row(ws, job, app_id):
         job_title,
         job_type,
         location,
-        platform_src,
+        platform,
         status,
         url,
         email,
@@ -166,27 +124,43 @@ def flush_pending_to_excel():
         except Exception:
             pending = []
 
-    if not pending or not os.path.exists(PRIMARY_EXCEL_PATH):
+    if not os.path.exists(PRIMARY_EXCEL_PATH):
         return False
 
     try:
         wb = openpyxl.load_workbook(PRIMARY_EXCEL_PATH)
         ws = wb.active
 
-        for job in pending:
-            app_id = job.get("app_id") or get_next_app_id()
-            format_and_append_row(ws, job, app_id)
+        # Update target links if needed
+        for r in range(2, ws.max_row + 1):
+            aid = str(ws.cell(row=r, column=1).value or "").strip()
+            if aid in TARGET_URL_UPDATES:
+                ws.cell(row=r, column=9).value = TARGET_URL_UPDATES[aid]
+
+        # Flush pending jobs
+        if pending:
+            for job in pending:
+                app_id = job.get("app_id") or get_next_app_id()
+                format_and_append_row(ws, job, app_id)
 
         wb.save(PRIMARY_EXCEL_PATH)
         wb.close()
 
-        if os.path.exists(PENDING_QUEUE_PATH):
+        if pending and os.path.exists(PENDING_QUEUE_PATH):
             try:
                 os.remove(PENDING_QUEUE_PATH)
             except Exception:
                 pass
+
+        if os.path.exists(BACKUP_EXCEL_DIR):
+            try:
+                shutil.copy2(PRIMARY_EXCEL_PATH, BACKUP_EXCEL_PATH)
+            except Exception:
+                pass
+
         return True
     except PermissionError:
+        # File is locked by open Excel instance, will flush when closed
         return False
     except Exception as e:
         print(f"Flush notice: {e}")
@@ -196,7 +170,7 @@ def update_job_status(app_id, new_status):
     # Try flushing first in case Excel was just closed
     flush_pending_to_excel()
 
-    # If item is in pending queue, update it there
+    # If item is in pending_jobs.json, update it there
     if os.path.exists(PENDING_QUEUE_PATH):
         try:
             with open(PENDING_QUEUE_PATH, "r", encoding="utf-8") as f:
@@ -231,6 +205,11 @@ def update_job_status(app_id, new_status):
             if found:
                 wb.save(PRIMARY_EXCEL_PATH)
                 wb.close()
+                if os.path.exists(BACKUP_EXCEL_DIR):
+                    try:
+                        shutil.copy2(PRIMARY_EXCEL_PATH, BACKUP_EXCEL_PATH)
+                    except Exception:
+                        pass
                 return True, f"Updated {app_id} status to '{new_status}' in Excel!"
             else:
                 wb.close()
@@ -280,7 +259,7 @@ def get_next_app_id():
     return f"APP-{max_id_num + 1:03d}"
 
 def append_job_to_excel(job):
-    init_excel_if_missing()
+    # Try flushing first in case Excel closed
     flush_pending_to_excel()
 
     next_id = get_next_app_id()
@@ -292,9 +271,16 @@ def append_job_to_excel(job):
         new_row_idx = format_and_append_row(ws, job, next_id)
         wb.save(PRIMARY_EXCEL_PATH)
         wb.close()
+
+        if os.path.exists(BACKUP_EXCEL_DIR):
+            try:
+                shutil.copy2(PRIMARY_EXCEL_PATH, BACKUP_EXCEL_PATH)
+            except Exception:
+                pass
+
         return next_id, new_row_idx - 1, "saved"
     except PermissionError:
-        # File is locked by open Excel instance! Queue safely without failing!
+        # Excel is currently open on desktop! Queue it safely!
         pending = []
         if os.path.exists(PENDING_QUEUE_PATH):
             try:
@@ -309,6 +295,7 @@ def append_job_to_excel(job):
         return next_id, len(pending), "queued"
 
 def get_tracker_html():
+    # Attempt a flush first
     flush_pending_to_excel()
 
     rows = []
@@ -323,6 +310,7 @@ def get_tracker_html():
         except Exception as e:
             rows = [[f"Error loading Excel: {e}"]]
 
+    # Also check if any pending jobs in queue
     pending_jobs = []
     if os.path.exists(PENDING_QUEUE_PATH):
         try:
@@ -331,48 +319,115 @@ def get_tracker_html():
         except Exception:
             pending_jobs = []
 
-    html = f"""<!DOCTYPE html>
+    html = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>JobPulse | Master Applications Tracker</title>
+  <title>Job Applications Tracker | Irfan Firdaus</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }}
-    body {{ background: #0B1120; color: #F1F5F9; padding: 24px; font-size: 13px; }}
-    .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #1E293B; padding-bottom: 16px; }}
-    h1 {{ font-size: 20px; font-weight: 800; color: #FFFFFF; display: flex; align-items: center; gap: 10px; }}
-    .badge {{ background: #1E3A8A; color: #93C5FD; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; }}
-    .btn {{ background: #10B981; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none; }}
-    .btn:hover {{ background: #059669; }}
-    .btn-secondary {{ background: #1E293B; color: #CBD5E1; }}
-    .btn-secondary:hover {{ background: #334155; }}
-    .card {{ background: #0F172A; border: 1px solid #1E293B; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }}
-    table {{ width: 100%; border-collapse: collapse; text-align: left; }}
-    th {{ background: #0F2C59; color: #FFFFFF; font-weight: 700; padding: 10px 14px; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.5px; border-bottom: 1px solid #1E293B; }}
-    td {{ padding: 9px 14px; border-bottom: 1px solid #1E293B; font-size: 12px; color: #CBD5E1; }}
-    tr:hover td {{ background: #1E293B80; }}
-    .status-pill {{ padding: 2px 8px; border-radius: 12px; font-size: 10.5px; font-weight: 700; display: inline-block; }}
-    .status-Applied {{ background: #0284C720; color: #38BDF8; border: 1px solid #0284C740; }}
-    .status-Under-Review {{ background: #D9770620; color: #FBBF24; border: 1px solid #D9770640; }}
-    .status-Interviewing {{ background: #D9770620; color: #FBBF24; border: 1px solid #D9770640; }}
-    .status-Offer-Received {{ background: #10B98120; color: #34D399; border: 1px solid #10B98140; }}
-    .status-Wishlist {{ background: #64748B20; color: #94A3B8; border: 1px solid #64748B40; }}
-    .status-Rejected {{ background: #E11D4820; color: #FB7185; border: 1px solid #E11D4840; }}
-    .mono {{ font-family: 'JetBrains Mono', monospace; font-size: 11.5px; }}
-    .status-select {{ background: #1E293B; color: #F1F5F9; border: 1px solid #334155; border-radius: 6px; padding: 3px 6px; font-size: 11px; font-weight: 600; cursor: pointer; outline: none; }}
-    .status-select:focus {{ border-color: #38BDF8; }}
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background: #0B1120; color: #F1F5F9; padding: 24px; font-size: 13px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #1E293B; padding-bottom: 16px; }
+    h1 { font-size: 20px; font-weight: 800; color: #FFFFFF; display: flex; align-items: center; gap: 10px; }
+    .badge { background: #1E3A8A; color: #93C5FD; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+    .btn { background: #10B981; color: white; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none; }
+    .btn:hover { background: #059669; }
+    .btn-secondary { background: #1E293B; color: #CBD5E1; }
+    .btn-secondary:hover { background: #334155; }
+    .card { background: #0F172A; border: 1px solid #1E293B; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { background: #0F2C59; color: #FFFFFF; font-weight: 700; padding: 10px 14px; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.5px; border-bottom: 1px solid #1E293B; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1E293B; font-size: 12px; color: #CBD5E1; }
+    tr:hover td { background: #1E293B80; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; }
+
+    /* Base Status Dropdown */
+    .status-select { 
+      border-radius: 8px; 
+      padding: 5px 10px; 
+      font-size: 11.5px; 
+      font-weight: 700; 
+      cursor: pointer; 
+      outline: none; 
+      transition: all 0.2s ease;
+      display: inline-block;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .status-select option { 
+      background: #0F172A; 
+      color: #F1F5F9; 
+      font-weight: 600; 
+      padding: 6px; 
+    }
+
+    /* Status Colors */
+    /* 1. Applied - Fresh Emerald Green */
+    .status-style-Applied { 
+      background: rgba(16, 185, 129, 0.2) !important; 
+      color: #34D399 !important; 
+      border: 1.5px solid #10B981 !important; 
+    }
+
+    /* 2. Rejected - Clear Red */
+    .status-style-Rejected { 
+      background: rgba(239, 68, 68, 0.22) !important; 
+      color: #F87171 !important; 
+      border: 1.5px solid #EF4444 !important; 
+    }
+
+    /* 3. Assessment / Test - Distinctive Purple */
+    .status-style-Assessment---Test, .status-style-Assessment-Test { 
+      background: rgba(168, 85, 247, 0.22) !important; 
+      color: #C084FC !important; 
+      border: 1.5px solid #A855F7 !important; 
+    }
+
+    /* 4. Under Review - Sky Blue */
+    .status-style-Under-Review { 
+      background: rgba(14, 165, 233, 0.2) !important; 
+      color: #38BDF8 !important; 
+      border: 1.5px solid #0EA5E9 !important; 
+    }
+
+    /* 5. Shortlisted - Bright Teal */
+    .status-style-Shortlisted { 
+      background: rgba(20, 184, 166, 0.22) !important; 
+      color: #2DD4BF !important; 
+      border: 1.5px solid #14B8A6 !important; 
+    }
+
+    /* 6. Interviewing - Warm Amber */
+    .status-style-Interviewing { 
+      background: rgba(245, 158, 11, 0.22) !important; 
+      color: #FBBF24 !important; 
+      border: 1.5px solid #F59E0B !important; 
+    }
+
+    /* 7. Offer Received - Mint Green */
+    .status-style-Offer-Received { 
+      background: rgba(34, 197, 94, 0.26) !important; 
+      color: #86EFAC !important; 
+      border: 1.5px solid #22C55E !important; 
+    }
+
+    /* 8. Target / Backlog & Neutral - Clean Dark Slate (No Distraction) */
+    .status-style-Target---Backlog, .status-style-default { 
+      background: #1E293B !important; 
+      color: #94A3B8 !important; 
+      border: 1px solid #334155 !important; 
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div>
-      <h1><span>📊 JobPulse Tracker</span> <span class="badge">Desktop Excel Sync</span></h1>
-      <p style="color: #64748B; font-size: 12px; margin-top: 4px;">{PRIMARY_EXCEL_PATH}</p>
+      <h1><span>📊 Job Applications Tracker</span> <span class="badge">Live View</span></h1>
+      <p style="color: #64748B; font-size: 12px; margin-top: 4px;">Muhammad Irfan Firdaus • C:\\Users\\ASUS\\Job_Tracker\\Job_Applications_Tracker.xlsx</p>
     </div>
-    <div style="display: flex; gap: 8px;">
-      <button onclick="launchExcel(this)" class="btn">📊 Open in Desktop Excel</button>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button onclick="launchExcel(this)" class="btn" style="cursor: pointer; border: none;">📊 Open in Microsoft Excel</button>
       <button onclick="location.reload()" class="btn btn-secondary">🔄 Refresh</button>
     </div>
   </div>
@@ -405,6 +460,10 @@ def get_tracker_html():
             "Rejected"
         ]
 
+        def get_status_class(status):
+            clean = (status or "").replace(" / ", "---").replace(" ", "-")
+            return f"status-style-{clean}"
+
         for row in rows[1:]:
             html += "<tr>"
             # App ID
@@ -424,12 +483,13 @@ def get_tracker_html():
             html += f"<td style='color: #CBD5E1;'>{row[6] if len(row) > 6 else ''}</td>"
             # Status
             status_text = row[7] if len(row) > 7 else 'Applied'
+            s_class = get_status_class(status_text)
             opts = "".join([f"<option value='{s}' {'selected' if s == status_text else ''}>{s}</option>" for s in STATUS_OPTIONS])
-            html += f"<td><select class='status-select' onchange=\"updateStatus('{aid}', this.value)\">{opts}</select></td>"
+            html += f"<td><select class='status-select {s_class}' onchange=\"updateStatus(this, '{aid}')\">{opts}</select></td>"
             # URL
             url_text = row[8] if len(row) > 8 else ''
             if url_text.startswith("http"):
-                html += f"<td><a href='{url_text}' target='_blank' style='color: #38BDF8;'>Link ↗</a></td>"
+                html += f"<td><a href='{url_text}' target='_blank' style='color: #38BDF8;'>Link</a></td>"
             else:
                 html += f"<td style='color: #64748B;'>-</td>"
             # Salary
@@ -443,10 +503,11 @@ def get_tracker_html():
         # Also render pending queued jobs in live web view
         for pj in pending_jobs:
             status_text = pj.get("status", "Applied")
+            s_class = get_status_class(status_text)
             aid = pj.get('app_id', 'NEW')
             opts = "".join([f"<option value='{s}' {'selected' if s == status_text else ''}>{s}</option>" for s in STATUS_OPTIONS])
             url_text = pj.get("url", "")
-            link_html = f"<a href='{url_text}' target='_blank' style='color: #38BDF8;'>Link ↗</a>" if url_text.startswith("http") else "<td style='color: #64748B;'>-</td>"
+            link_html = f"<a href='{url_text}' target='_blank' style='color: #38BDF8;'>Link</a>" if url_text.startswith("http") else "<td style='color: #64748B;'>-</td>"
             html += f"""<tr style="background: rgba(16, 185, 129, 0.08);">
               <td class='mono' style='color: #34D399; font-weight: bold;'>{aid} <span style="font-size: 9px; background: #059669; color: white; padding: 1px 4px; border-radius: 4px;">LIVE</span></td>
               <td class='mono' style='color: #94A3B8;'>{pj.get('date_applied', '')}</td>
@@ -455,7 +516,7 @@ def get_tracker_html():
               <td style='color: #94A3B8;'>{pj.get('job_type', '')}</td>
               <td style='color: #94A3B8;'>{pj.get('location', '')}</td>
               <td style='color: #CBD5E1;'>{pj.get('platform', '')}</td>
-              <td><select class='status-select' onchange=\"updateStatus('{aid}', this.value)\">{opts}</select></td>
+              <td><select class='status-select {s_class}' onchange=\"updateStatus(this, '{aid}')\">{opts}</select></td>
               <td>{link_html}</td>
               <td class='mono' style='color: #34D399; font-weight: 600;'>{pj.get('salary', '')}</td>
               <td style='color: #94A3B8; max-width: 320px; font-size: 11px;'>{pj.get('notes', '')}</td>
@@ -463,7 +524,41 @@ def get_tracker_html():
 
         html += """</tbody></table></div>
   <script>
-    async function updateStatus(appId, newStatus) {
+    function updateSelectColor(selectEl) {
+      const val = selectEl.value;
+      const clean = (val || "").replace(/ \/ /g, '---').replace(/ /g, '-');
+      const classes = Array.from(selectEl.classList).filter(c => !c.startsWith('status-style-'));
+      selectEl.className = classes.join(' ');
+      selectEl.classList.add('status-style-' + clean);
+    }
+
+    async function launchExcel(btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = "⏳ Opening...";
+      btn.disabled = true;
+      const toast = document.getElementById("launchToast");
+      try {
+        const res = await fetch("/open-excel");
+        const data = await res.json();
+        toast.style.display = "block";
+        toast.style.background = "#064E3B";
+        toast.style.color = "#A7F3D0";
+        toast.innerHTML = "✅ Excel opening command sent! Check your taskbar for Excel (or open directly: <code>C:\\\\Users\\\\ASUS\\\\Job_Tracker\\\\Job_Applications_Tracker.xlsx</code>)";
+        setTimeout(() => { toast.style.display = "none"; }, 8000);
+      } catch (err) {
+        toast.style.display = "block";
+        toast.style.background = "#7F1D1D";
+        toast.style.color = "#FECACA";
+        toast.innerText = "Error: " + err;
+      } finally {
+        btn.innerHTML = orig;
+        btn.disabled = false;
+      }
+    }
+
+    async function updateStatus(selectEl, appId) {
+      const newStatus = selectEl.value;
+      updateSelectColor(selectEl);
       const toast = document.getElementById("launchToast");
       try {
         const res = await fetch("/update-status", {
@@ -488,27 +583,6 @@ def get_tracker_html():
         toast.style.background = "#7F1D1D";
         toast.style.color = "#FECACA";
         toast.innerText = "Error updating status: " + err;
-      }
-    }
-
-    async function launchExcel(btn) {
-      const orig = btn.innerHTML;
-      btn.innerHTML = "⏳ Opening...";
-      btn.disabled = true;
-      const toast = document.getElementById("launchToast");
-      try {
-        const res = await fetch("/open-excel");
-        const data = await res.json();
-        toast.style.display = "block";
-        toast.innerHTML = "✅ Excel command sent to your desktop OS!";
-        setTimeout(() => { toast.style.display = "none"; }, 6000);
-      } catch (err) {
-        toast.style.display = "block";
-        toast.style.background = "#7F1D1D";
-        toast.innerText = "Error contacting bridge: " + err;
-      } finally {
-        btn.innerHTML = orig;
-        btn.disabled = false;
       }
     }
   </script>
@@ -546,13 +620,15 @@ class TrackerHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
+            external_connected = os.path.exists(BACKUP_EXCEL_DIR)
+
             response_data = {
                 "status": "connected",
-                "os": OS_SYSTEM,
                 "excel_path": PRIMARY_EXCEL_PATH,
+                "external_backup_available": external_connected,
                 "total_records": total_records + pending_count,
                 "pending_queue": pending_count,
-                "message": "JobPulse Sync Bridge is Active"
+                "message": "Job Tracker Sync Bridge is Active"
             }
             self.send_response(200)
             self._send_cors_headers()
@@ -578,6 +654,7 @@ class TrackerHandler(BaseHTTPRequestHandler):
 
         else:
             self.send_response(404)
+            self._send_cors_headers()
             self.end_headers()
 
     def do_POST(self):
@@ -588,7 +665,7 @@ class TrackerHandler(BaseHTTPRequestHandler):
                 job_data = json.loads(post_data.decode("utf-8"))
                 app_id, total, status_type = append_job_to_excel(job_data)
                 
-                msg = f"Successfully logged {app_id} to Excel!" if status_type == "saved" else f"Added {app_id} to live tracker! (Will sync to Excel file as soon as Excel closes)"
+                msg = f"Successfully added {app_id} to Excel!" if status_type == "saved" else f"Added {app_id} to live tracker! (Will sync to Excel file as soon as Excel closes)"
 
                 response_data = {
                     "success": True,
@@ -631,6 +708,7 @@ class TrackerHandler(BaseHTTPRequestHandler):
 
         else:
             self.send_response(404)
+            self._send_cors_headers()
             self.end_headers()
 
     def log_message(self, format, *args):
@@ -642,23 +720,21 @@ def background_worker():
         flush_pending_to_excel()
 
 def run_server():
-    init_excel_if_missing()
     server_address = ("127.0.0.1", PORT)
     httpd = HTTPServer(server_address, TrackerHandler)
-    print("=" * 60)
-    print(f"   JobPulse Excel Sync Bridge ({OS_SYSTEM})")
-    print(f"   Target Excel: {PRIMARY_EXCEL_PATH}")
-    print(f"   Dashboard:    http://127.0.0.1:{PORT}/view")
-    print("=" * 60)
-    print("Bridge is running. Keep this terminal window open.")
-
+    print(f"=====================================================")
+    print(f"   JOB TRACKER EXCEL SYNC BRIDGE (C: DRIVE MASTER)")
+    print(f"   Primary Excel: {PRIMARY_EXCEL_PATH}")
+    print(f"   Web Dashboard: http://127.0.0.1:{PORT}/view")
+    print(f"=====================================================")
+    
+    # Start auto-flush worker in background
     t = threading.Thread(target=background_worker, daemon=True)
     t.start()
 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping bridge...")
         httpd.server_close()
 
 if __name__ == "__main__":

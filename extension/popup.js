@@ -34,7 +34,7 @@ function initDefaults() {
   document.getElementById("dateApplied").value = today;
 }
 
-// Check Python Bridge Connectivity (Optional for local Excel users)
+// Check Python Bridge Connectivity
 async function checkBridgeStatus() {
   const pill = document.getElementById("statusPill");
   const text = document.getElementById("statusText");
@@ -52,26 +52,23 @@ async function checkBridgeStatus() {
       isBridgeConnected = true;
       pill.className = "status-pill";
       text.innerText = "Excel Connected";
-      if (bridgeDetail) {
-        bridgeDetail.innerHTML = `<span style="color: #10B981; font-weight: 600;">Active</span> • File: <code>${data.excel_path}</code><br>Total Records: <b>${data.total_records}</b>`;
-      }
+      bridgeDetail.innerHTML = `<span style="color: #10B981; font-weight: 600;">Connected</span> to <code>${data.excel_path}</code><br>Total Records: <b>${data.total_records}</b>`;
+      // Auto-sync any jobs saved while offline
       syncOfflineJobsToExcel();
       return true;
     }
   } catch (err) {
-    // Offline - perfectly fine, extension operates standalone
+    // Offline
   }
 
   isBridgeConnected = false;
   pill.className = "status-pill offline";
-  text.innerText = "Browser Local";
-  if (bridgeDetail) {
-    bridgeDetail.innerHTML = `<span style="color: #64748B; font-weight: 600;">Standalone Mode</span>. Applications save directly inside your browser storage.<br>Run <code>start_bridge</code> to link with desktop Excel.`;
-  }
+  text.innerText = "Offline (Local)";
+  bridgeDetail.innerHTML = `<span style="color: #F59E0B; font-weight: 600;">Offline</span> (Bridge not running).<br>Run <code>Start_Job_Tracker.bat</code> to connect live with Excel.`;
   return false;
 }
 
-// Auto-sync any jobs saved while offline to desktop Excel
+// Auto-sync any offline/local jobs into Excel when bridge connects
 async function syncOfflineJobsToExcel() {
   if (!isBridgeConnected) return;
   chrome.storage.local.get({ jobs: [] }, async (res) => {
@@ -124,18 +121,16 @@ async function autoDetectJobDetails() {
       platformSelect.value = "JobStreet";
     } else if (urlLower.includes("indeed.com")) {
       platformSelect.value = "Indeed";
-    } else if (urlLower.includes("glassdoor.com")) {
-      platformSelect.value = "Glassdoor";
     } else if (urlLower.includes("myfuturejobs")) {
       platformSelect.value = "MyFutureJobs";
-    } else if (urlLower.includes("handshake")) {
-      platformSelect.value = "Handshake";
+    } else if (urlLower.includes("glassdoor.com")) {
+      platformSelect.value = "Glassdoor";
     } else {
       platformSelect.value = "Company Portal";
     }
 
     // Attempt DOM Scrape via Scripting API
-    if (tab.id && !tab.url.startsWith("chrome://") && !tab.url.startsWith("edge://") && !tab.url.startsWith("opera://") && !tab.url.startsWith("about:")) {
+    if (tab.id && !tab.url.startsWith("chrome://") && !tab.url.startsWith("edge://") && !tab.url.startsWith("opera://")) {
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: scrapePageData
@@ -232,11 +227,21 @@ function setupEventListeners() {
   const jobForm = document.getElementById("jobForm");
   if (jobForm) jobForm.addEventListener("submit", handleSubmit);
 
-  const openDashboardBtn = document.getElementById("openDashboardBtn");
-  if (openDashboardBtn) {
-    openDashboardBtn.addEventListener("click", (e) => {
+  const openTrackerBtn = document.getElementById("openTrackerBtn");
+  if (openTrackerBtn) {
+    openTrackerBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      openDashboard();
+      e.stopPropagation();
+      openTrackerDashboard(false);
+    });
+  }
+
+  const openExcelDirectBtn = document.getElementById("openExcelDirectBtn");
+  if (openExcelDirectBtn) {
+    openExcelDirectBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTrackerDashboard(true);
     });
   }
 
@@ -244,7 +249,8 @@ function setupEventListeners() {
   if (openExcelBtn) {
     openExcelBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      openExcelOrDashboard();
+      e.stopPropagation();
+      openTrackerDashboard(true);
     });
   }
 
@@ -255,28 +261,39 @@ function setupEventListeners() {
   if (exportBtn) exportBtn.addEventListener("click", exportCsv);
 }
 
-// Open In-Browser Dashboard (Works standalone on Mac/Windows/Linux)
-function openDashboard() {
-  const dashboardUrl = chrome.runtime.getURL("dashboard.html");
-  chrome.tabs.create({ url: dashboardUrl });
-}
-
-// Open Excel directly if bridge is connected, else open Dashboard
-async function openExcelOrDashboard() {
-  if (isBridgeConnected) {
-    try {
-      showToast("Triggering Excel on desktop...", "success");
-      await fetch(`${BRIDGE_URL}/open-excel`);
+// Open Live Tracker Dashboard Tab & Excel File
+async function openTrackerDashboard(launchExcel = true) {
+  try {
+    // 1. Immediately open the rich live tracker dashboard in a new Opera tab
+    if (chrome && chrome.tabs && chrome.tabs.create) {
       chrome.tabs.create({ url: `${BRIDGE_URL}/view` });
-      return;
-    } catch (err) {
-      console.warn("Failed to reach bridge:", err);
+    } else {
+      window.open(`${BRIDGE_URL}/view`, "_blank");
     }
-  }
 
-  // Fallback to standalone dashboard
-  openDashboard();
-  showToast("Opened standalone Dashboard! Run bridge to sync with Excel.", "success");
+    // 2. Request Bridge to trigger Excel or Explorer
+    if (launchExcel) {
+      showToast("Opening Tracker Dashboard & Excel...", "success");
+      try {
+        const res = await fetch(`${BRIDGE_URL}/open-excel`);
+        const data = await res.json();
+        if (data.success) {
+          isBridgeConnected = true;
+          const pill = document.getElementById("statusPill");
+          if (pill) {
+            pill.className = "status-pill";
+            document.getElementById("statusText").innerText = "Excel Connected";
+          }
+        }
+      } catch (err) {
+        console.warn("Could not trigger Excel via bridge:", err);
+      }
+    } else {
+      showToast("Opened Live Tracker Tab!", "success");
+    }
+  } catch (err) {
+    showToast("Bridge offline! Run Start_Job_Tracker.bat on C: drive", "error");
+  }
 }
 
 // Handle Form Submission
@@ -289,20 +306,19 @@ async function handleSubmit(e) {
     platform: document.getElementById("platform").value,
     status: document.getElementById("status").value,
     job_type: document.getElementById("jobType").value,
-    location: document.getElementById("location").value.trim() || "Remote / Hybrid",
+    location: document.getElementById("location").value.trim() || "Kuala Lumpur, Malaysia",
     date_applied: document.getElementById("dateApplied").value,
     salary: document.getElementById("salary").value.trim(),
     email: document.getElementById("email").value.trim(),
     url: document.getElementById("url").value.trim(),
-    notes: document.getElementById("notes").value.trim(),
-    created_at: new Date().toISOString()
+    notes: document.getElementById("notes").value.trim()
   };
 
   const saveBtn = document.getElementById("saveBtn");
   saveBtn.disabled = true;
   saveBtn.innerText = "Saving...";
 
-  // 1. If Bridge is Connected, send to desktop Excel
+  // 1. Try sending to Python Bridge
   if (isBridgeConnected) {
     try {
       const response = await fetch(`${BRIDGE_URL}/add-job`, {
@@ -314,28 +330,27 @@ async function handleSubmit(e) {
       if (response.ok) {
         const result = await response.json();
         job.app_id = result.app_id;
+        showToast(result.message || `Saved to Tracker as ${result.app_id}!`, "success");
         await saveToLocalStorage(job);
         await loadRecentApplications();
-        showToast(result.message || `Saved to Excel as ${result.app_id}!`, "success");
         resetFormExceptDates();
         saveBtn.disabled = false;
-        saveBtn.innerText = "Save Application";
+        saveBtn.innerText = "Save to Excel Tracker";
         return;
       }
     } catch (err) {
-      console.warn("Bridge save failed, falling back to local storage:", err);
+      console.warn("Failed to reach bridge, falling back to local storage:", err);
     }
   }
 
-  // 2. Standalone Save to chrome.storage.local
-  const total = await getLocalCount();
-  job.app_id = `APP-${String(total + 1).padStart(3, "0")}`;
+  // 2. Offline Fallback to chrome.storage.local
+  job.app_id = `LOCAL-${Date.now().toString().slice(-4)}`;
   await saveToLocalStorage(job);
   await loadRecentApplications();
-  showToast(`Application saved as ${job.app_id}!`, "success");
+  showToast(`Saved locally as ${job.app_id}! (Will sync to Excel when bridge runs)`, "success");
   resetFormExceptDates();
   saveBtn.disabled = false;
-  saveBtn.innerText = "Save Application";
+  saveBtn.innerText = "Save to Excel Tracker";
 }
 
 // Reset Form fields
@@ -347,133 +362,6 @@ function resetFormExceptDates() {
   document.getElementById("notes").value = "";
 }
 
-// Helper: Get Count of Stored Jobs
-async function getLocalCount() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get({ jobs: [] }, (res) => {
-      resolve(res.jobs.length);
-    });
-  });
-}
-
-// Save job record to browser local storage
-async function saveToLocalStorage(job) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get({ jobs: [] }, (res) => {
-      const jobs = res.jobs;
-      // Prepend so newest is first
-      jobs.unshift(job);
-      chrome.storage.local.set({ jobs }, () => resolve());
-    });
-  });
-}
-
-// Load Recent Applications into Tab 2
-async function loadRecentApplications() {
-  chrome.storage.local.get({ jobs: [] }, (res) => {
-    const jobs = res.jobs;
-    const countEl = document.getElementById("recentCount");
-    const container = document.getElementById("recentContainer");
-
-    if (countEl) countEl.innerText = jobs.length;
-    if (!container) return;
-
-    if (jobs.length === 0) {
-      container.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 24px;">No applications recorded yet.<br>Apply on any job portal and click Save!</p>`;
-      return;
-    }
-
-    let html = "";
-    jobs.slice(0, 10).forEach(j => {
-      let badgeStyle = "background: #E2E8F0; color: #475569;";
-      if (j.status === "Applied") badgeStyle = "background: #DBEAFE; color: #1E40AF;";
-      else if (j.status === "Interviewing") badgeStyle = "background: #FEF3C7; color: #92400E;";
-      else if (j.status === "Offer Received") badgeStyle = "background: #D1FAE5; color: #065F46;";
-      else if (j.status === "Rejected") badgeStyle = "background: #FEE2E2; color: #991B1B;";
-
-      html += `
-        <div class="recent-item">
-          <div class="recent-item-header">
-            <span class="recent-company">${escapeHtml(j.company)}</span>
-            <span class="recent-status" style="${badgeStyle}">${escapeHtml(j.status)}</span>
-          </div>
-          <div class="recent-title">${escapeHtml(j.job_title)}</div>
-          <div class="recent-meta">
-            <span>📅 ${j.date_applied || "N/A"}</span>
-            <span>🌐 ${escapeHtml(j.platform)}</span>
-            ${j.salary ? `<span>💰 ${escapeHtml(j.salary)}</span>` : ""}
-          </div>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-  });
-}
-
-// Export All Stored Jobs to CSV File
-function exportCsv() {
-  chrome.storage.local.get({ jobs: [] }, (res) => {
-    const jobs = res.jobs;
-    if (jobs.length === 0) {
-      showToast("No applications to export!", "error");
-      return;
-    }
-
-    const headers = ["App ID", "Date Applied", "Company", "Job Title", "Job Type", "Location", "Platform", "Status", "Job URL", "Email", "Salary", "Notes"];
-    const csvRows = [headers.join(",")];
-
-    jobs.forEach(j => {
-      const row = [
-        `"${(j.app_id || "").replace(/"/g, '""')}"`,
-        `"${(j.date_applied || "").replace(/"/g, '""')}"`,
-        `"${(j.company || "").replace(/"/g, '""')}"`,
-        `"${(j.job_title || "").replace(/"/g, '""')}"`,
-        `"${(j.job_type || "").replace(/"/g, '""')}"`,
-        `"${(j.location || "").replace(/"/g, '""')}"`,
-        `"${(j.platform || "").replace(/"/g, '""')}"`,
-        `"${(j.status || "").replace(/"/g, '""')}"`,
-        `"${(j.url || "").replace(/"/g, '""')}"`,
-        `"${(j.email || "").replace(/"/g, '""')}"`,
-        `"${(j.salary || "").replace(/"/g, '""')}"`,
-        `"${(j.notes || "").replace(/"/g, '""')}"`
-      ];
-      csvRows.push(row.join(","));
-    });
-
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Job_Applications_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Downloaded CSV backup successfully!", "success");
-  });
-}
-
-// Copy Application Details to Clipboard
-function copyApplicationDetails() {
-  const company = document.getElementById("company").value.trim();
-  const title = document.getElementById("jobTitle").value.trim();
-  const platform = document.getElementById("platform").value;
-  const status = document.getElementById("status").value;
-  const date = document.getElementById("dateApplied").value;
-  const url = document.getElementById("url").value.trim();
-
-  if (!company || !title) {
-    showToast("Please fill Company and Title first!", "error");
-    return;
-  }
-
-  const text = `📌 Job Application: ${title} at ${company}\nPlatform: ${platform}\nStatus: ${status}\nDate: ${date}\nLink: ${url || "N/A"}`;
-  navigator.clipboard.writeText(text).then(() => {
-    showToast("Copied application summary to clipboard!", "success");
-  }).catch(() => {
-    showToast("Failed to copy to clipboard", "error");
-  });
-}
-
 // Toast helper
 function showToast(message, type = "success") {
   const toast = document.getElementById("toast");
@@ -481,16 +369,106 @@ function showToast(message, type = "success") {
   toast.className = type;
   setTimeout(() => {
     toast.className = "";
-  }, 4000);
+  }, 4500);
 }
 
-// Escape HTML helper
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+// Save in Chrome/Opera local storage
+async function saveToLocalStorage(job) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["applications"], (result) => {
+      const list = result.applications || [];
+      list.unshift(job);
+      chrome.storage.local.set({ applications: list }, () => resolve());
+    });
+  });
+}
+
+// Load Recent Applications into the UI
+async function loadRecentApplications() {
+  chrome.storage.local.get(["applications"], (result) => {
+    const list = result.applications || [];
+    document.getElementById("recentCount").innerText = list.length;
+    const container = document.getElementById("recentContainer");
+
+    if (list.length === 0) {
+      container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">No applications recorded yet.</p>';
+      return;
+    }
+
+    container.innerHTML = list.slice(0, 15).map(item => {
+      const sClean = (item.status || "default").replace(/ \/ /g, "---").replace(/ /g, "-");
+      const statusClass = `status-badge-${sClean}`;
+      return `
+      <div class="recent-item">
+        <div class="recent-item-header">
+          <span class="recent-company">${escapeHtml(item.company)}</span>
+          <span class="recent-status ${statusClass}">${escapeHtml(item.status || "Applied")}</span>
+        </div>
+        <div class="recent-title">${escapeHtml(item.job_title)}</div>
+        <div class="recent-meta">
+          <span>${item.date_applied || ""}</span>
+          <span>•</span>
+          <span>${escapeHtml(item.platform || "")}</span>
+          <span>•</span>
+          <span>${item.app_id || ""}</span>
+        </div>
+      </div>
+    `;
+    }).join("");
+  });
+}
+
+// Copy Summary to Clipboard
+function copyApplicationDetails() {
+  const comp = document.getElementById("company").value.trim() || "Company";
+  const title = document.getElementById("jobTitle").value.trim() || "Role";
+  const url = document.getElementById("url").value.trim();
+  const date = document.getElementById("dateApplied").value;
+  const status = document.getElementById("status").value;
+
+  const text = `Application Log: ${comp} | ${title}\nDate: ${date} | Status: ${status}\nURL: ${url}`;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast("Application summary copied to clipboard!", "success");
+  });
+}
+
+// Export CSV Backup
+function exportCsv() {
+  chrome.storage.local.get(["applications"], (result) => {
+    const list = result.applications || [];
+    if (list.length === 0) {
+      alert("No applications saved locally yet.");
+      return;
+    }
+
+    const headers = ["App ID", "Date", "Company", "Job Title", "Platform", "Status", "Salary", "Location", "URL", "Notes"];
+    const rows = list.map(j => [
+      j.app_id || "",
+      j.date_applied || "",
+      `"${(j.company || '').replace(/"/g, '""')}"`,
+      `"${(j.job_title || '').replace(/"/g, '""')}"`,
+      j.platform || "",
+      j.status || "",
+      j.salary || "",
+      `"${(j.location || '').replace(/"/g, '""')}"`,
+      `"${(j.url || '').replace(/"/g, '""')}"`,
+      `"${(j.notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Job_Applications_Backup_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.innerText = text;
+  return div.innerHTML;
 }

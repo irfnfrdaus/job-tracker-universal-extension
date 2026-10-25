@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JobPulse - Application Tracker</title>
+  <title>Job Tracker Quick Add</title>
   <style>
     :root {
-      --primary: #0F172A;
-      --primary-hover: #1E293B;
+      --primary: #0F2C59;
+      --primary-hover: #1E3A8A;
       --accent: #2563EB;
-      --accent-hover: #1D4ED8;
       --success: #10B981;
       --warning: #F59E0B;
       --danger: #EF4444;
       --bg: #F8FAFC;
       --card-bg: #FFFFFF;
-      --text: #0F172A;
+      --text: #1E293B;
       --text-muted: #64748B;
       --border: #E2E8F0;
       --radius: 8px;
@@ -29,7 +28,7 @@
     }
 
     body {
-      width: 390px;
+      width: 380px;
       background: var(--bg);
       color: var(--text);
       font-size: 13px;
@@ -48,7 +47,7 @@
       border-bottom: 2px solid var(--accent);
     }
 
-    .header-brand {
+    .header-title {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -57,13 +56,12 @@
       letter-spacing: -0.2px;
     }
 
-    .header-tag {
+    .header-badge {
       font-size: 10px;
-      background: rgba(37, 99, 235, 0.4);
-      color: #93C5FD;
+      background: rgba(255, 255, 255, 0.2);
       padding: 2px 6px;
       border-radius: 12px;
-      font-weight: 600;
+      font-weight: 500;
     }
 
     /* Status Pill */
@@ -74,16 +72,15 @@
       font-size: 11px;
       padding: 3px 8px;
       border-radius: 12px;
-      background: rgba(16, 185, 129, 0.2);
-      color: #34D399;
+      background: rgba(16, 185, 129, 0.18);
+      color: #A7F3D0;
       font-weight: 600;
-      cursor: pointer;
       transition: all 0.2s;
     }
 
     .status-pill.offline {
-      background: rgba(100, 116, 139, 0.25);
-      color: #94A3B8;
+      background: rgba(245, 158, 11, 0.2);
+      color: #FDE68A;
     }
 
     .status-dot {
@@ -94,53 +91,7 @@
     }
 
     .status-pill.offline .status-dot {
-      background: #94A3B8;
-    }
-
-    /* Quick Action Bar */
-    .action-bar {
-      background: #0B132B;
-      padding: 8px 12px;
-      display: flex;
-      gap: 8px;
-      border-bottom: 1px solid #1E293B;
-    }
-
-    .action-btn {
-      flex: 1;
-      padding: 7px 10px;
-      border: none;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 11px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      transition: background 0.15s, transform 0.05s;
-    }
-
-    .action-btn:active {
-      transform: scale(0.98);
-    }
-
-    .btn-dashboard {
-      background: var(--accent);
-      color: #FFFFFF;
-    }
-
-    .btn-dashboard:hover {
-      background: var(--accent-hover);
-    }
-
-    .btn-excel {
-      background: #059669;
-      color: #FFFFFF;
-    }
-
-    .btn-excel:hover {
-      background: #047857;
+      background: #F59E0B;
     }
 
     /* Tabs */
@@ -153,7 +104,7 @@
     .tab-btn {
       flex: 1;
       text-align: center;
-      padding: 9px 8px;
+      padding: 8px 10px;
       font-size: 12px;
       font-weight: 600;
       color: var(--text-muted);
@@ -170,8 +121,8 @@
     }
 
     .tab-btn.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
+      color: var(--primary);
+      border-bottom-color: var(--primary);
       background: #FFFFFF;
     }
 
@@ -260,10 +211,10 @@
     .btn-submit {
       width: 100%;
       padding: 10px;
-      background: var(--accent);
+      background: var(--primary);
       color: #FFFFFF;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 600;
       border: none;
       border-radius: var(--radius);
       cursor: pointer;
@@ -272,11 +223,11 @@
       justify-content: center;
       gap: 6px;
       transition: background 0.15s, transform 0.05s;
-      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+      box-shadow: 0 2px 4px rgba(15, 44, 89, 0.2);
     }
 
     .btn-submit:hover {
-      background: var(--accent-hover);
+      background: var(--primary-hover);
     }
 
     .btn-submit:active {
@@ -338,11 +289,19 @@
 
     .recent-status {
       font-size: 10px;
-      padding: 1px 6px;
+      padding: 2px 7px;
       border-radius: 8px;
-      font-weight: 600;
-      background: #E2E8F0;
+      font-weight: 700;
+      display: inline-block;
     }
+    .status-badge-Applied { background: #DCFCE7; color: #15803D; border: 1px solid #86EFAC; }
+    .status-badge-Rejected { background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; }
+    .status-badge-Assessment---Test, .status-badge-Assessment-Test { background: #EDE9FE; color: #6B21A8; border: 1px solid #C4B5FD; }
+    .status-badge-Under-Review { background: #E0F2FE; color: #0369A1; border: 1px solid #7DD3FC; }
+    .status-badge-Shortlisted { background: #CCFBF1; color: #0F766E; border: 1px solid #5EEAD4; }
+    .status-badge-Interviewing { background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; }
+    .status-badge-Offer-Received { background: #BBF7D0; color: #166534; border: 1px solid #4ADE80; }
+    .status-badge-Target---Backlog, .status-badge-default { background: #F1F5F9; color: #64748B; border: 1px solid #CBD5E1; }
 
     .recent-title {
       color: var(--text);
@@ -357,7 +316,7 @@
       gap: 8px;
     }
 
-    /* Cards */
+    /* Help Tab Card */
     .card {
       background: #FFFFFF;
       border: 1px solid var(--border);
@@ -382,45 +341,37 @@
       padding-left: 16px;
       margin-top: 4px;
     }
-
-    code {
-      background: #E2E8F0;
-      padding: 1px 4px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 11px;
-    }
   </style>
 </head>
 <body>
 
   <!-- Top Header -->
   <div class="header">
-    <div class="header-brand">
-      <span>JobPulse</span>
-      <span class="header-tag">Universal</span>
+    <div class="header-title">
+      <span>Job Tracker Quick Add</span>
+      <span class="header-badge">Opera</span>
     </div>
-    <div id="statusPill" class="status-pill offline" title="Click to refresh sync status">
+    <div id="statusPill" class="status-pill offline" title="Click to refresh connection">
       <div class="status-dot"></div>
-      <span id="statusText">Browser Local</span>
+      <span id="statusText">Checking...</span>
     </div>
   </div>
 
   <!-- Quick Action Bar -->
-  <div class="action-bar">
-    <button type="button" id="openDashboardBtn" class="action-btn btn-dashboard">
-      <span>🌐 Open Dashboard</span>
+  <div style="background: #0B192C; padding: 8px 12px; display: flex; gap: 8px; border-bottom: 1px solid var(--border);">
+    <button type="button" id="openTrackerBtn" style="flex: 1; padding: 7px 8px; background: #2563EB; color: #FFFFFF; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.15s;">
+      <span>🌐 View Tracker (Tab)</span>
     </button>
-    <button type="button" id="openExcelBtn" class="action-btn btn-excel">
-      <span>📊 Excel Sync</span>
+    <button type="button" id="openExcelDirectBtn" style="flex: 1; padding: 7px 8px; background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.15s;">
+      <span>📊 Open Excel File</span>
     </button>
   </div>
 
   <!-- Tabs Navigation -->
   <div class="tabs">
     <button class="tab-btn active" data-tab="tab-add">Log Job</button>
-    <button class="tab-btn" data-tab="tab-recent">Applications (<span id="recentCount">0</span>)</button>
-    <button class="tab-btn" data-tab="tab-settings">Setup & Sync</button>
+    <button class="tab-btn" data-tab="tab-recent">Recent (<span id="recentCount">0</span>)</button>
+    <button class="tab-btn" data-tab="tab-help">Status & Help</button>
   </div>
 
   <!-- TAB 1: ADD JOB FORM -->
@@ -430,12 +381,12 @@
     <form id="jobForm">
       <div class="form-group">
         <label for="company">Company Name *</label>
-        <input type="text" id="company" required placeholder="e.g. Google, Microsoft, Maybank">
+        <input type="text" id="company" required placeholder="e.g. PETRONAS, Maybank, CIMB">
       </div>
 
       <div class="form-group">
         <label for="jobTitle">Job Title *</label>
-        <input type="text" id="jobTitle" required placeholder="e.g. Software Engineer, Data Analyst">
+        <input type="text" id="jobTitle" required placeholder="e.g. Executive Data Analytics">
       </div>
 
       <div class="form-row">
@@ -444,22 +395,21 @@
           <select id="platform">
             <option value="LinkedIn">LinkedIn</option>
             <option value="JobStreet">JobStreet</option>
-            <option value="Indeed">Indeed</option>
             <option value="Company Portal">Company Portal</option>
-            <option value="Glassdoor">Glassdoor</option>
-            <option value="Handshake">Handshake</option>
+            <option value="Indeed">Indeed</option>
             <option value="MyFutureJobs">MyFutureJobs</option>
+            <option value="Direct HR Email">Direct HR Email</option>
+            <option value="Glassdoor">Glassdoor</option>
             <option value="Referral">Referral</option>
-            <option value="Career Fair">Career Fair</option>
             <option value="Other">Other</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label for="status">Status</label>
+          <label for="status">Application Status</label>
           <select id="status">
             <option value="Applied">Applied</option>
-            <option value="Wishlist / Target">Wishlist / Target</option>
+            <option value="Target / Backlog">Target / Backlog</option>
             <option value="Assessment / Test">Assessment / Test</option>
             <option value="Interviewing">Interviewing</option>
             <option value="Shortlisted">Shortlisted</option>
@@ -474,16 +424,17 @@
           <label for="jobType">Job Type</label>
           <select id="jobType">
             <option value="Graduate Programme">Graduate Programme</option>
+            <option value="Management Trainee">Management Trainee</option>
+            <option value="Permanent">Permanent</option>
             <option value="Full-time">Full-time</option>
             <option value="Internship">Internship</option>
-            <option value="Management Trainee">Management Trainee</option>
             <option value="Contract">Contract</option>
           </select>
         </div>
 
         <div class="form-group">
           <label for="location">Location</label>
-          <input type="text" id="location" placeholder="e.g. Kuala Lumpur / Remote">
+          <input type="text" id="location" placeholder="e.g. Kuala Lumpur">
         </div>
       </div>
 
@@ -494,13 +445,13 @@
         </div>
 
         <div class="form-group">
-          <label for="salary">Salary / Range</label>
-          <input type="text" id="salary" placeholder="e.g. 5,000 / $80k">
+          <label for="salary">Expected Salary (RM)</label>
+          <input type="text" id="salary" placeholder="e.g. 5,000">
         </div>
       </div>
 
       <div class="form-group">
-        <label for="email">HR / Recruiter Email</label>
+        <label for="email">HR Contact / Email</label>
         <input type="text" id="email" placeholder="e.g. careers@company.com">
       </div>
 
@@ -510,53 +461,57 @@
       </div>
 
       <div class="form-group">
-        <label for="notes">Notes & Key Skills</label>
-        <textarea id="notes" placeholder="e.g. Tech stack: React, Python; HR screening on Friday..."></textarea>
+        <label for="notes">Notes / Requirements / Tech Stack</label>
+        <textarea id="notes" placeholder="e.g. Requires Alteryx / SQL / Lakehouse; HR interview next Tuesday..."></textarea>
       </div>
 
       <button type="submit" id="saveBtn" class="btn-submit">
-        <span>Save Application</span>
+        <span>Save to Excel Tracker</span>
+      </button>
+
+      <button type="button" id="openExcelBtn" class="btn-secondary" style="background: #F0FDF4; color: #166534; border-color: #BBF7D0;">
+        <span>📊 Open Excel Tracker Sheet</span>
       </button>
 
       <button type="button" id="copyDetailsBtn" class="btn-secondary">
-        <span>Copy Application Summary</span>
+        <span>Copy Application Summary to Clipboard</span>
       </button>
     </form>
   </div>
 
-  <!-- TAB 2: RECENT APPLICATIONS -->
+  <!-- TAB 2: RECENT SAVED JOBS -->
   <div id="tab-recent" class="tab-content">
     <div id="recentContainer" class="recent-list">
-      <p style="text-align: center; color: var(--text-muted); padding: 20px;">No applications saved yet.</p>
+      <p style="text-align: center; color: var(--text-muted); padding: 20px;">No applications recorded yet.</p>
     </div>
     <button id="exportCsvBtn" class="btn-secondary" style="margin-top: 10px;">
-      <span>📥 Export All to CSV (Excel / Sheets)</span>
+      <span>Export All to CSV Backup</span>
     </button>
   </div>
 
-  <!-- TAB 3: SETUP & SYNC -->
-  <div id="tab-settings" class="tab-content">
+  <!-- TAB 3: HELP & STATUS -->
+  <div id="tab-help" class="tab-content">
     <div class="card">
-      <h4>💾 Standalone Mode (Zero-Config)</h4>
-      <p>Works right out of the box on <b>Mac, Windows, and Linux</b>! All jobs are saved securely in your browser's local database. You can export to CSV anytime.</p>
-    </div>
-
-    <div class="card">
-      <h4>⚡ Live Desktop Excel Sync (Optional)</h4>
-      <p id="bridgeDetail">Bridge status: checking...</p>
-      <ul style="margin-top: 6px;">
-        <li><b>Windows:</b> Double-click <code>start_bridge.bat</code> in the <code>bridge/</code> folder.</li>
-        <li><b>macOS / Linux:</b> Run <code>bash start_bridge.sh</code> in the terminal.</li>
-        <li>Auto-creates <code>Job_Applications_Tracker.xlsx</code> in your user Documents folder.</li>
-      </ul>
-      <button id="retryBridgeBtn" class="btn-secondary" style="margin-top: 8px;">
-        🔄 Check Bridge Connection
+      <h4>Excel Sync Bridge</h4>
+      <p id="bridgeDetail">Checking bridge status on port 5252...</p>
+      <button id="retryBridgeBtn" class="btn-secondary" style="margin-top: 6px;">
+        Reconnect Bridge
       </button>
     </div>
 
     <div class="card">
-      <h4>🌐 Browser Support</h4>
-      <p>Tested and fully compatible with <b>Google Chrome</b>, <b>Opera & Opera GX</b>, <b>Microsoft Edge</b>, <b>Brave</b>, and <b>Arc Browser</b>.</p>
+      <h4>Local Excel File</h4>
+      <p>Target file:<br><b>C:\Users\ASUS\Job_Tracker\Job_Applications_Tracker.xlsx</b></p>
+      <ul style="margin-top: 6px;">
+        <li><b>Connected:</b> Saves directly to the Excel file silently.</li>
+        <li><b>Offline:</b> Saves inside Opera storage; you can export anytime.</li>
+        <li><b>USB Safe:</b> Extension runs from C: drive, so you can eject your external hard disk anytime!</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>Start Bridge Script</h4>
+      <p>Double-click <code>Start_Job_Tracker.bat</code> in <code>C:\Users\ASUS\Job_Tracker\</code> to start the background bridge.</p>
     </div>
   </div>
 
