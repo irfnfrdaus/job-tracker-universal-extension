@@ -57,19 +57,13 @@ def launch_excel():
     except Exception:
         pass
 
-    # 2. Try launching via file association and explorer
-    try:
-        os.startfile(PRIMARY_EXCEL_PATH)
-    except Exception:
-        pass
-
-    # 3. Open File Explorer highlighting the file so user has instant physical access
+    # 2. Open File Explorer highlighting the file so user has instant physical access
     try:
         subprocess.Popen(["explorer.exe", f"/select,{PRIMARY_EXCEL_PATH}"])
     except Exception:
         pass
 
-    return True, "Excel opening command triggered and file location highlighted in File Explorer!"
+    return True, "File location highlighted in File Explorer!"
 
 def format_and_append_row(ws, job, app_id):
     date_applied = job.get("date_applied") or datetime.now().strftime("%Y-%m-%d")
@@ -436,8 +430,7 @@ def get_tracker_html():
       <h1><span>📊 Job Applications Tracker</span> <span class="badge">Live View</span></h1>
       <p style="color: #64748B; font-size: 12px; margin-top: 4px;">Muhammad Irfan Firdaus • C:\\Users\\ASUS\\Job_Tracker\\Job_Applications_Tracker.xlsx</p>
     </div>
-    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-      <a href="/download-excel" class="btn" style="background: #2563EB; text-decoration: none;">📥 Download / Open .xlsx</a>
+    <div style="display: flex; gap: 8px; align-items: center;">
       <button onclick="launchExcel(this)" class="btn" style="cursor: pointer; border: none;">📊 Open in Microsoft Excel</button>
       <button onclick="location.reload()" class="btn btn-secondary">🔄 Refresh</button>
     </div>
@@ -551,19 +544,11 @@ def get_tracker_html():
       try {
         const res = await fetch("/open-excel");
         const data = await res.json();
-        
-        // Also trigger browser download/open directly in user's active window
-        const iframe = document.createElement("iframe");
-        iframe.style.display = "none";
-        iframe.src = "/download-excel";
-        document.body.appendChild(iframe);
-        setTimeout(() => iframe.remove(), 10000);
-
         toast.style.display = "block";
         toast.style.background = "#064E3B";
         toast.style.color = "#A7F3D0";
-        toast.innerHTML = "✅ Excel opening command triggered! A copy is also downloading in Opera. Check your taskbar / downloads, or use the Desktop shortcut: <code>Job Applications Tracker.lnk</code>";
-        setTimeout(() => { toast.style.display = "none"; }, 10000);
+        toast.innerHTML = "📁 Highlighted in File Explorer: <code>Job_Applications_Tracker.xlsx</code> (Press Enter to open, or double-click the Desktop shortcut)";
+        setTimeout(() => { toast.style.display = "none"; }, 8000);
       } catch (err) {
         toast.style.display = "block";
         toast.style.background = "#7F1D1D";
@@ -662,28 +647,6 @@ class TrackerHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(html_content.encode("utf-8"))
-
-        elif self.path == "/download-excel":
-            flush_pending_to_excel()
-            if os.path.exists(PRIMARY_EXCEL_PATH):
-                try:
-                    with open(PRIMARY_EXCEL_PATH, "rb") as f:
-                        file_bytes = f.read()
-                    self.send_response(200)
-                    self._send_cors_headers()
-                    self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                    self.send_header("Content-Disposition", 'attachment; filename="Job_Applications_Tracker.xlsx"')
-                    self.send_header("Content-Length", str(len(file_bytes)))
-                    self.end_headers()
-                    self.wfile.write(file_bytes)
-                except Exception as e:
-                    self.send_response(500)
-                    self._send_cors_headers()
-                    self.end_headers()
-                    self.wfile.write(f"Error streaming file: {e}".encode("utf-8"))
-            else:
-                self.send_response(404)
-                self.end_headers()
 
         elif self.path == "/open-excel":
             success, msg = launch_excel()
