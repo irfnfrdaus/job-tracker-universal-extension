@@ -53,6 +53,10 @@ async function checkBridgeStatus() {
       pill.className = "status-pill";
       text.innerText = "Excel Connected";
       bridgeDetail.innerHTML = `<span style="color: #10B981; font-weight: 600;">Connected</span> to <code>${data.excel_path}</code><br>Total Records: <b>${data.total_records}</b>`;
+      const targetPathEl = document.getElementById("targetFilePath");
+      if (targetPathEl && data.excel_path) {
+        targetPathEl.innerText = data.excel_path;
+      }
       // Auto-sync any jobs saved while offline
       syncOfflineJobsToExcel();
       return true;
@@ -64,7 +68,7 @@ async function checkBridgeStatus() {
   isBridgeConnected = false;
   pill.className = "status-pill offline";
   text.innerText = "Offline (Local)";
-  bridgeDetail.innerHTML = `<span style="color: #F59E0B; font-weight: 600;">Offline</span> (Bridge not running).<br>Run <code>Start_Job_Tracker.bat</code> to connect live with Excel.`;
+  bridgeDetail.innerHTML = `<span style="color: #F59E0B; font-weight: 600;">Offline</span> (Bridge not running).<br>Run <code>start_bridge.bat</code> or <code>start_bridge.sh</code> to connect live with Excel.`;
   return false;
 }
 
@@ -264,7 +268,7 @@ function setupEventListeners() {
 // Open Live Tracker Dashboard Tab & Excel File
 async function openTrackerDashboard(launchExcel = true) {
   try {
-    // 1. Immediately open the rich live tracker dashboard in a new Opera tab
+    // 1. Immediately open the rich live tracker dashboard in a new tab
     if (chrome && chrome.tabs && chrome.tabs.create) {
       chrome.tabs.create({ url: `${BRIDGE_URL}/view` });
     } else {
@@ -292,7 +296,7 @@ async function openTrackerDashboard(launchExcel = true) {
       showToast("Opened Live Tracker Tab!", "success");
     }
   } catch (err) {
-    showToast("Bridge offline! Run Start_Job_Tracker.bat on C: drive", "error");
+    showToast("Bridge offline! Run start_bridge.bat or start_bridge.sh", "error");
   }
 }
 

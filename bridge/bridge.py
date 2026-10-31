@@ -10,20 +10,16 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-PRIMARY_EXCEL_PATH = r"C:\Users\ASUS\Job_Tracker\Job_Applications_Tracker.xlsx"
-PENDING_QUEUE_PATH = r"C:\Users\ASUS\Job_Tracker\pending_jobs.json"
-BACKUP_EXCEL_DIR = r"D:\Job_Tracker_Backup"
-BACKUP_EXCEL_PATH = r"D:\Job_Tracker_Backup\Job_Applications_Tracker.xlsx"
-PORT = 5252
-EXCEL_EXE = r"C:\Program Files\Microsoft Office\Root\Office16\EXCEL.EXE"
+DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), "Documents", "Job_Tracker")
+DATA_DIR = os.environ.get("JOB_TRACKER_DIR", DEFAULT_DATA_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
 
-TARGET_URL_UPDATES = {
-    "APP-001": "https://www.petronas.com/careers",
-    "APP-002": "https://maybankjobs.com/#/home",
-    "APP-003": "https://www.cimb.com/en/careers/fresh-graduate/the-complete-banker.html",
-    "APP-005": "https://www.bnm.gov.my/careers/vacancy",
-    "APP-007": "https://maxine.wd3.myworkdayjobs.com/Maxis-Early-Careers"
-}
+PRIMARY_EXCEL_PATH = os.path.join(DATA_DIR, "Job_Applications_Tracker.xlsx")
+PENDING_QUEUE_PATH = os.path.join(DATA_DIR, "pending_jobs.json")
+BACKUP_EXCEL_DIR = os.path.join(DATA_DIR, "backups")
+os.makedirs(BACKUP_EXCEL_DIR, exist_ok=True)
+BACKUP_EXCEL_PATH = os.path.join(BACKUP_EXCEL_DIR, "Job_Applications_Tracker_Backup.xlsx")
+PORT = int(os.environ.get("JOB_TRACKER_PORT", 5252))
 
 STATUS_COLORS = {
     "Applied": "DCFCE7",        # Soft Green
@@ -43,27 +39,105 @@ THIN_BORDER = Border(
     bottom=Side(style='thin', color='CBD5E1')
 )
 
+def ensure_primary_workbook_exists():
+    """Auto-generates a clean 13-column formatted Excel tracker if it does not already exist."""
+    if os.path.exists(PRIMARY_EXCEL_PATH):
+        return
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Applications"
+
+    headers = [
+        "Application ID",
+        "Date Applied",
+        "Company Name",
+        "Job Title",
+        "Job Type",
+        "Location",
+        "Platform / Source",
+        "Status",
+        "Job URL",
+        "HR / Contact Email",
+        "Expected Salary",
+        "Follow-Up Date",
+        "Notes & Tech Stack"
+    ]
+
+    ws.append(headers)
+    ws.row_dimensions[1].height = 26
+
+    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="0F2C59", end_color="0F2C59", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = THIN_BORDER
+
+    col_widths = {
+        'A': 16, # Application ID
+        'B': 14, # Date Applied
+        'C': 26, # Company Name
+        'D': 32, # Job Title
+        'E': 18, # Job Type
+        'F': 20, # Location
+        'G': 18, # Platform
+        'H': 18, # Status
+        'I': 35, # Job URL
+        'J': 26, # HR / Contact Email
+        'K': 18, # Expected Salary
+        'L': 14, # Follow-Up Date
+        'M': 45  # Notes
+    }
+    for col, width in col_widths.items():
+        ws.column_dimensions[col].width = width
+
+    ws.freeze_panes = "A2"
+    wb.save(PRIMARY_EXCEL_PATH)
+    wb.close()
+    print(f"Created template Excel tracker at: {PRIMARY_EXCEL_PATH}")
+
 def launch_excel():
-    # 0. Flush any pending jobs into Excel file first
+    # 0. Ensure workbook exists and flush any pending jobs into Excel file first
+    ensure_primary_workbook_exists()
     flush_pending_to_excel()
 
-    # 1. Terminate any headless zombie Excel processes that block interactive UI
-    try:
-        subprocess.run(
-            ["powershell", "-NoProfile", "-Command", "Get-Process excel -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq '' } | Stop-Process -Force"],
-            capture_output=True,
-            timeout=3
-        )
-    except Exception:
-        pass
+    # Cross-platform file opening
+    if sys.platform.startswith("win"):
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", "Get-Process excel -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq '' } | Stop-Process -Force"],
+                capture_output=True,
+                timeout=3
+            )
+        except Exception:
+            pass
 
-    # 2. Open File Explorer highlighting the file so user has instant physical access
-    try:
-        subprocess.Popen(["explorer.exe", f"/select,{PRIMARY_EXCEL_PATH}"])
-    except Exception:
-        pass
-
-    return True, "File location highlighted in File Explorer!"
+        try:
+            subprocess.Popen(["explorer.exe", f"/select,{PRIMARY_EXCEL_PATH}"])
+            return True, "File location highlighted in File Explorer!"
+        except Exception:
+            try:
+                os.startfile(PRIMARY_EXCEL_PATH)
+                return True, "Opened in Excel!"
+            except Exception as e:
+                return False, f"Could not launch file: {e}"
+    elif sys.platform == "darwin":  # macOS
+        try:
+            subprocess.Popen(["open", PRIMARY_EXCEL_PATH])
+            return True, "Opened in Excel / Numbers!"
+        except Exception as e:
+            return False, f"Could not launch file: {e}"
+    else:  # Linux
+        try:
+            subprocess.Popen(["xdg-open", PRIMARY_EXCEL_PATH])
+            return True, "Opened in spreadsheet viewer!"
+        except Exception as e:
+            return False, f"Could not launch file: {e}"
 
 def format_and_append_row(ws, job, app_id):
     date_applied = job.get("date_applied") or datetime.now().strftime("%Y-%m-%d")
@@ -132,17 +206,11 @@ def flush_pending_to_excel():
         return True
 
     if not os.path.exists(PRIMARY_EXCEL_PATH):
-        return False
+        ensure_primary_workbook_exists()
 
     try:
         wb = openpyxl.load_workbook(PRIMARY_EXCEL_PATH)
         ws = wb.active
-
-        # Update target links if needed
-        for r in range(2, ws.max_row + 1):
-            aid = str(ws.cell(row=r, column=1).value or "").strip()
-            if aid in TARGET_URL_UPDATES:
-                ws.cell(row=r, column=9).value = TARGET_URL_UPDATES[aid]
 
         # Flush pending jobs
         if pending:
@@ -330,7 +398,7 @@ def get_tracker_html():
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Job Applications Tracker | Irfan Firdaus</title>
+  <title>Job Applications Tracker | Live View</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -430,11 +498,11 @@ def get_tracker_html():
 <body>
   <div class="header">
     <div>
-      <h1><span>📊 Job Applications Tracker</span> <span class="badge">Live View</span></h1>
-      <p style="color: #64748B; font-size: 12px; margin-top: 4px;">Muhammad Irfan Firdaus • C:\\Users\\ASUS\\Job_Tracker\\Job_Applications_Tracker.xlsx</p>
+      <h1><span>🎯 Job Applications Tracker</span> <span class="badge">Live View</span></h1>
+      <p style="color: #64748B; font-size: 12px; margin-top: 4px;">Universal Local Bridge &bull; <span style="font-family: monospace;">""" + PRIMARY_EXCEL_PATH + """</span></p>
     </div>
     <div style="display: flex; gap: 8px; align-items: center;">
-      <button onclick="launchExcel(this)" class="btn" style="cursor: pointer; border: none;">📊 Open in Microsoft Excel</button>
+      <button onclick="launchExcel(this)" class="btn" style="cursor: pointer; border: none;">📊 Open in Excel</button>
       <button onclick="location.reload()" class="btn btn-secondary">🔄 Refresh</button>
     </div>
   </div>
@@ -533,7 +601,7 @@ def get_tracker_html():
   <script>
     function updateSelectColor(selectEl) {
       const val = selectEl.value;
-      const clean = (val || "").replace(/ \/ /g, '---').replace(/ /g, '-');
+      const clean = (val || "").replace(/ \\/ /g, '---').replace(/ /g, '-');
       const classes = Array.from(selectEl.classList).filter(c => !c.startsWith('status-style-'));
       selectEl.className = classes.join(' ');
       selectEl.classList.add('status-style-' + clean);
@@ -727,11 +795,12 @@ def background_worker():
         flush_pending_to_excel()
 
 def run_server():
+    ensure_primary_workbook_exists()
     server_address = ("127.0.0.1", PORT)
     HTTPServer.allow_reuse_address = True
     httpd = HTTPServer(server_address, TrackerHandler)
     print(f"=====================================================")
-    print(f"   JOB TRACKER EXCEL SYNC BRIDGE (C: DRIVE MASTER)")
+    print(f"   JOBPULSE UNIVERSAL EXCEL SYNC BRIDGE")
     print(f"   Primary Excel: {PRIMARY_EXCEL_PATH}")
     print(f"   Web Dashboard: http://127.0.0.1:{PORT}/view")
     print(f"=====================================================")

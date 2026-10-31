@@ -349,7 +349,7 @@
   <div class="header">
     <div class="header-title">
       <span>Job Tracker Quick Add</span>
-      <span class="header-badge">Opera</span>
+      <span class="header-badge">Universal</span>
     </div>
     <div id="statusPill" class="status-pill offline" title="Click to refresh connection">
       <div class="status-dot"></div>
@@ -501,17 +501,17 @@
 
     <div class="card">
       <h4>Local Excel File</h4>
-      <p>Target file:<br><b>C:\Users\ASUS\Job_Tracker\Job_Applications_Tracker.xlsx</b></p>
+      <p>Target file:<br><b id="targetFilePath">~/Documents/Job_Tracker/Job_Applications_Tracker.xlsx</b></p>
       <ul style="margin-top: 6px;">
         <li><b>Connected:</b> Saves directly to the Excel file silently.</li>
-        <li><b>Offline:</b> Saves inside Opera storage; you can export anytime.</li>
-        <li><b>USB Safe:</b> Extension runs from C: drive, so you can eject your external hard disk anytime!</li>
+        <li><b>Offline:</b> Saves inside local browser storage; you can export anytime.</li>
+        <li><b>Safe & Isolated:</b> Master files are stored locally in your Documents folder.</li>
       </ul>
     </div>
 
     <div class="card">
       <h4>Start Bridge Script</h4>
-      <p>Double-click <code>Start_Job_Tracker.bat</code> in <code>C:\Users\ASUS\Job_Tracker\</code> to start the background bridge.</p>
+      <p>Run <code>start_bridge.bat</code> (Windows) or <code>start_bridge.sh</code> (macOS/Linux) in the <code>bridge/</code> folder to start the background bridge.</p>
     </div>
   </div>
 
