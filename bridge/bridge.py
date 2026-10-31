@@ -12,8 +12,8 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 PRIMARY_EXCEL_PATH = r"C:\Users\ASUS\Job_Tracker\Job_Applications_Tracker.xlsx"
 PENDING_QUEUE_PATH = r"C:\Users\ASUS\Job_Tracker\pending_jobs.json"
-BACKUP_EXCEL_DIR = r"E:\JOB APPLICATION"
-BACKUP_EXCEL_PATH = r"E:\JOB APPLICATION\Job_Applications_Tracker.xlsx"
+BACKUP_EXCEL_DIR = r"D:\Job_Tracker_Backup"
+BACKUP_EXCEL_PATH = r"D:\Job_Tracker_Backup\Job_Applications_Tracker.xlsx"
 PORT = 5252
 EXCEL_EXE = r"C:\Program Files\Microsoft Office\Root\Office16\EXCEL.EXE"
 
@@ -127,6 +127,9 @@ def flush_pending_to_excel():
                 pending = json.load(f)
         except Exception:
             pending = []
+
+    if not pending:
+        return True
 
     if not os.path.exists(PRIMARY_EXCEL_PATH):
         return False
@@ -725,6 +728,7 @@ def background_worker():
 
 def run_server():
     server_address = ("127.0.0.1", PORT)
+    HTTPServer.allow_reuse_address = True
     httpd = HTTPServer(server_address, TrackerHandler)
     print(f"=====================================================")
     print(f"   JOB TRACKER EXCEL SYNC BRIDGE (C: DRIVE MASTER)")
